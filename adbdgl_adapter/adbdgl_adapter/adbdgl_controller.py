@@ -20,6 +20,9 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         self.adb_map = dict()  # Maps ArangoDB vertex IDs to DGL node IDs
 
     def extract_dgl_atribute(self, val, atrib: str):
+        if type(val) in [int, float]:
+            return val
+
         if atrib == "Sex":
             return 0 if val == "M" else 1
 

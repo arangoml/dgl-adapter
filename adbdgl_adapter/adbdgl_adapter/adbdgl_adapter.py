@@ -4,12 +4,14 @@
 @author: Anthony Mahanna
 """
 
-from dgl.heterograph import DGLHeteroGraph
 from .abc import ADBDGL_Adapter
 from .adbdgl_controller import Base_ADBDGL_Controller
 
 import dgl
+from dgl.heterograph import DGLHeteroGraph
+
 import torch
+from collections import defaultdict
 from arango import ArangoClient
 
 
@@ -38,35 +40,85 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         self.__cntrl: Base_ADBDGL_Controller = controller_class()
 
     def arangodb_to_dgl(
-        self, name: str, graph_attributes: dict, is_keep=True, **query_options
+        self,
+        name: str,
+        graph_attributes: dict,
+        extract_attributes=True,
+        **query_options,
     ):
         self.__validate_attributes("graph", set(graph_attributes), self.GRAPH_ATRIBS)
+        # if extract_attributes and type(self.__cntrl) == Base_ADBDGL_Controller:
+        #     raise ValueError(
+        #         f"Must implement custom ADBDGL_Controller if extract_attributes flag is enabled"
+        #     )
+
         data_dict = {}
+
+        ndata = defaultdict(lambda: defaultdict(list))  # wtf am i doing
+        edata = defaultdict(lambda: defaultdict(list))  # wtf am i doing
 
         for v_col, atribs in graph_attributes["vertexCollections"].items():
             dgl_node_count: int = 0
-            for v in self.__fetch_adb_docs(v_col, atribs, is_keep, query_options):
+            for v in self.__fetch_adb_docs(v_col, atribs, query_options):
                 self.__cntrl.adb_map[v["_id"]] = {
                     "id": dgl_node_count,
                     "collection": v_col,
                 }
                 dgl_node_count += 1
 
-        for e_col, atribs in graph_attributes["edgeCollections"].items():
-            src_nodes = []
-            dst_nodes = []
-            for e in self.__fetch_adb_docs(e_col, atribs, is_keep, query_options):
-                src_nodes.append(self.__cntrl.adb_map[e["_from"]]["id"])
-                dst_nodes.append(self.__cntrl.adb_map[e["_to"]]["id"])
+                if extract_attributes:
+                    for atrib in atribs:
+                        if atrib not in v:
+                            raise KeyError(f"{atrib} not in {v['_id']}")
+                        ndata[atrib][v_col].append(
+                            self.__cntrl.extract_dgl_atribute(v.get(atrib), atrib)
+                        )
 
-            src_collection = self.__cntrl.adb_map[e["_from"]]["collection"]
-            dst_collection = self.__cntrl.adb_map[e["_to"]]["collection"]
-            data_dict[(src_collection, e_col, dst_collection)] = (
-                torch.tensor(src_nodes),
-                torch.tensor(dst_nodes),
+        from_col = set()
+        to_col = set()
+        for e_col, atribs in graph_attributes["edgeCollections"].items():
+            from_nodes = []
+            to_nodes = []
+            for e in self.__fetch_adb_docs(e_col, atribs, query_options):
+                from_node = self.__cntrl.adb_map[e["_from"]]
+                to_node = self.__cntrl.adb_map[e["_to"]]
+
+                from_col.add(from_node["collection"])
+                to_col.add(to_node["collection"])
+                if len(from_col) > 1 or len(to_col) > 1:
+                    raise ValueError(f"too many '_from' & '_to' collections in {e_col}")
+
+                from_nodes.append(from_node["id"])
+                to_nodes.append(to_node["id"])
+
+                if extract_attributes:
+                    for atrib in atribs:
+                        if atrib not in e:
+                            raise KeyError(f"{atrib} not in {e['_id']}")
+                        edata[atrib][e_col].append(
+                            self.__cntrl.extract_dgl_atribute(e.get(atrib), atrib)
+                        )
+
+            data_dict[(from_col.pop(), e_col, to_col.pop())] = (
+                torch.tensor(from_nodes),
+                torch.tensor(to_nodes),
             )
 
         dgl_graph: DGLHeteroGraph = dgl.heterograph(data_dict)
+        if extract_attributes:
+            for key, col_dict in ndata.items():
+                for col, val in col_dict.items():
+                    dgl_graph.ndata[key] = {
+                        **dgl_graph.ndata[key],
+                        col: torch.tensor(val),
+                    }
+            for key, col_dict in edata.items():
+                for col, val in col_dict.items():
+                    dgl_graph.edata[key] = {
+                        **dgl_graph.edata[key],
+                        col: torch.tensor(val),
+                    }
+
         print(f"DGL: {name} created")
         return dgl_graph
 
@@ -83,7 +135,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         }
 
         return self.arangodb_to_dgl(
-            name, graph_attributes, is_keep=False, **query_options
+            name, graph_attributes, extract_attributes=False, **query_options
         )
 
     def arangodb_graph_to_dgl(self, name: str, **query_options):
@@ -93,17 +145,13 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
-    def __fetch_adb_docs(
-        self, col: str, attributes: set, is_keep: bool, query_options: dict
-    ):
+    def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.
 
         :param col: The ArangoDB collection.
         :type col: str
         :param attributes: The set of document attributes.
         :type attributes: set
-        :param is_keep: Only keep the document attributes specified in **attributes** when returning the document. Otherwise, all document attributes are included.
-        :type is_keep: bool
         :param query_options: Keyword arguments to specify AQL query options when fetching documents from the ArangoDB instance.
         :type query_options: **kwargs
         :return: Result cursor.
@@ -111,8 +159,10 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         """
         aql = f"""
             FOR doc IN {col}
-                RETURN {is_keep} ? 
-                    MERGE(KEEP(doc, {list(attributes)}), {{"_id": doc._id}}) : doc
+                RETURN MERGE(
+                    KEEP(doc, {list(attributes)}), 
+                    {{"_id": doc._id, "_from": doc._from, "_to": doc._to}}
+                )
         """
 
         return self.__db.aql.execute(aql, **query_options)
