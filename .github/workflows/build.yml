@@ -12,7 +12,7 @@ jobs:
         working-directory: ${{env.SOURCE_DIR}}
     strategy:
       matrix:
-        python: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python: ["3.6", "3.7", "3.8", "3.9"]
     name: Python ${{ matrix.python }}
     env:
       COVERALLS_REPO_TOKEN: ${{secrets.COVERALLS_REPO_TOKEN}}
