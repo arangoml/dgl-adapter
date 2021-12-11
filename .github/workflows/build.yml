@@ -1,0 +1,34 @@
+
+name: build
+on: [push]
+env:
+  SOURCE_DIR: adbdgl_adapter
+  PACKAGE_DIR: adbdgl_adapter
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{env.SOURCE_DIR}}
+    strategy:
+      matrix:
+        python: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+    name: Python ${{ matrix.python }}
+    env:
+      COVERALLS_REPO_TOKEN: ${{secrets.COVERALLS_REPO_TOKEN}}
+      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Lint with Black
+        uses: psf/black@stable
+        with:
+          options: "--check --verbose --diff --color"
+          src: ${{env.PACKAGE_DIR}}
+      - name: Install dependencies
+        run: pip install -e . pytest
+      - name: Run pytest
+        run: pytest -v --color=yes --code-highlight=yes

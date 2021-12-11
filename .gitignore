@@ -1,0 +1,13 @@
+.ipynb_checkpoints
+.tox
+.DS_Store
+**/*.pyc
+# log files
+**/*.log
+# Setuptools distribution folder.
+adbdgl_adapter/dist/
+# Remove the build directory from repo
+adbdgl_adapter/build/
+adbdgl_adapter/*.egg-info
+.vscode
+.venv
