@@ -7,12 +7,15 @@
 from .abc import ADBDGL_Adapter
 from .adbdgl_controller import Base_ADBDGL_Controller
 
-import dgl
-from dgl.heterograph import DGLHeteroGraph
-
-import torch
-from collections import defaultdict
 from arango import ArangoClient
+from collections import defaultdict
+
+import dgl
+import torch
+
+from typing import Any, Union
+from dgl.heterograph import DGLHeteroGraph
+from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
 
 
 class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
@@ -43,19 +46,13 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         self,
         name: str,
         graph_attributes: dict,
-        extract_attributes=True,
         **query_options,
     ):
         self.__validate_attributes("graph", set(graph_attributes), self.GRAPH_ATRIBS)
-        # if extract_attributes and type(self.__cntrl) == Base_ADBDGL_Controller:
-        #     raise ValueError(
-        #         f"Must implement custom ADBDGL_Controller if extract_attributes flag is enabled"
-        #     )
 
         data_dict = {}
-
-        ndata = defaultdict(lambda: defaultdict(list))  # wtf am i doing
-        edata = defaultdict(lambda: defaultdict(list))  # wtf am i doing
+        ndata = defaultdict(lambda: defaultdict(list))
+        edata = defaultdict(lambda: defaultdict(list))
 
         for v_col, atribs in graph_attributes["vertexCollections"].items():
             dgl_node_count: int = 0
@@ -66,13 +63,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 }
                 dgl_node_count += 1
 
-                if extract_attributes:
-                    for atrib in atribs:
-                        if atrib not in v:
-                            raise KeyError(f"{atrib} not in {v['_id']}")
-                        ndata[atrib][v_col].append(
-                            self.__cntrl.extract_dgl_atribute(v.get(atrib), atrib)
-                        )
+                self.__prepare_dgl_features(v_col, atribs, v, ndata)
 
         from_col = set()
         to_col = set()
@@ -91,13 +82,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 from_nodes.append(from_node["id"])
                 to_nodes.append(to_node["id"])
 
-                if extract_attributes:
-                    for atrib in atribs:
-                        if atrib not in e:
-                            raise KeyError(f"{atrib} not in {e['_id']}")
-                        edata[atrib][e_col].append(
-                            self.__cntrl.extract_dgl_atribute(e.get(atrib), atrib)
-                        )
+                self.__prepare_dgl_features(e_col, atribs, e, edata)
 
             data_dict[(from_col.pop(), e_col, to_col.pop())] = (
                 torch.tensor(from_nodes),
@@ -105,22 +90,32 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             )
 
         dgl_graph: DGLHeteroGraph = dgl.heterograph(data_dict)
-        if extract_attributes:
-            for key, col_dict in ndata.items():
-                for col, val in col_dict.items():
-                    dgl_graph.ndata[key] = {
-                        **dgl_graph.ndata[key],
-                        col: torch.tensor(val),
-                    }
-            for key, col_dict in edata.items():
-                for col, val in col_dict.items():
-                    dgl_graph.edata[key] = {
-                        **dgl_graph.edata[key],
-                        col: torch.tensor(val),
-                    }
+        self.__insert_dgl_features(ndata, dgl_graph.ndata)
+        self.__insert_dgl_features(edata, dgl_graph.edata)
 
         print(f"DGL: {name} created")
         return dgl_graph
+
+    def __insert_dgl_features(
+        self,
+        features: defaultdict[Any, defaultdict[Any, list]],
+        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+    ):
+        for key, col_dict in features.items():
+            for col, array in col_dict.items():
+                data[key] = {**data[key], col: torch.tensor(array)}
+
+    def __prepare_dgl_features(
+        self,
+        col: str,
+        attributes: set,
+        doc: dict,
+        features: defaultdict[Any, defaultdict[Any, list]],
+    ):
+        for a in attributes:
+            if a not in doc:
+                raise KeyError(f"{a} not in {doc['_id']}")
+            features[a][col].append(self.__cntrl.attribute_to_feature(col, a, doc[a]))
 
     def arangodb_collections_to_dgl(
         self,
@@ -134,9 +129,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             "edgeCollections": {col: {} for col in edge_collections},
         }
 
-        return self.arangodb_to_dgl(
-            name, graph_attributes, extract_attributes=False, **query_options
-        )
+        return self.arangodb_to_dgl(name, graph_attributes, **query_options)
 
     def arangodb_graph_to_dgl(self, name: str, **query_options):
         graph = self.__db.graph(name)
