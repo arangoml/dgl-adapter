@@ -55,15 +55,15 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         edata = defaultdict(lambda: defaultdict(list))
 
         for v_col, atribs in graph_attributes["vertexCollections"].items():
-            dgl_node_count: int = 0
+            node_id = 0
             for v in self.__fetch_adb_docs(v_col, atribs, query_options):
                 self.__cntrl.adb_map[v["_id"]] = {
-                    "id": dgl_node_count,
+                    "id": node_id,
                     "collection": v_col,
                 }
-                dgl_node_count += 1
+                node_id += 1
 
-                self.__prepare_dgl_features(v_col, atribs, v, ndata)
+                self.__prepare_dgl_features(ndata, v_col, atribs, v)
 
         from_col = set()
         to_col = set()
@@ -82,7 +82,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 from_nodes.append(from_node["id"])
                 to_nodes.append(to_node["id"])
 
-                self.__prepare_dgl_features(e_col, atribs, e, edata)
+                self.__prepare_dgl_features(edata, e_col, atribs, e)
 
             data_dict[(from_col.pop(), e_col, to_col.pop())] = (
                 torch.tensor(from_nodes),
@@ -117,9 +117,6 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
-
-
-
     def __insert_dgl_features(
         self,
         features: defaultdict,
@@ -131,10 +128,10 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
     def __prepare_dgl_features(
         self,
+        features: defaultdict,
         col: str,
         attributes: set,
         doc: dict,
-        features: defaultdict,
     ):
         for a in attributes:
             if a not in doc:
