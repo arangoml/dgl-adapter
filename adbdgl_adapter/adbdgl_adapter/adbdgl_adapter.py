@@ -96,27 +96,6 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         print(f"DGL: {name} created")
         return dgl_graph
 
-    def __insert_dgl_features(
-        self,
-        features: defaultdict[Any, defaultdict[Any, list]],
-        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
-    ):
-        for key, col_dict in features.items():
-            for col, array in col_dict.items():
-                data[key] = {**data[key], col: torch.tensor(array)}
-
-    def __prepare_dgl_features(
-        self,
-        col: str,
-        attributes: set,
-        doc: dict,
-        features: defaultdict[Any, defaultdict[Any, list]],
-    ):
-        for a in attributes:
-            if a not in doc:
-                raise KeyError(f"{a} not in {doc['_id']}")
-            features[a][col].append(self.__cntrl.attribute_to_feature(col, a, doc[a]))
-
     def arangodb_collections_to_dgl(
         self,
         name: str,
@@ -137,6 +116,30 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         e_cols = {col["edge_collection"] for col in graph.edge_definitions()}
 
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
+
+
+
+
+    def __insert_dgl_features(
+        self,
+        features: defaultdict,
+        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+    ):
+        for key, col_dict in features.items():
+            for col, array in col_dict.items():
+                data[key] = {**data[key], col: torch.tensor(array)}
+
+    def __prepare_dgl_features(
+        self,
+        col: str,
+        attributes: set,
+        doc: dict,
+        features: defaultdict,
+    ):
+        for a in attributes:
+            if a not in doc:
+                raise KeyError(f"{a} not in {doc['_id']}")
+            features[a][col].append(self.__cntrl.attribute_to_feature(col, a, doc[a]))
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.
