@@ -167,8 +167,8 @@ def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
 
 
 def assert_arangodb_data(
-    name: str,
     adapter: ArangoDB_DGL_Adapter,
+    name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
     is_dgl_data: bool,
