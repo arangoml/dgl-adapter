@@ -22,7 +22,7 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         self.adb_map = dict()  # Maps ArangoDB vertex IDs to DGL node IDs
         self.lambda_map = defaultdict(lambda: defaultdict(int))
 
-    def attribute_to_feature(self, col: str, atrib: str, val):
+    def adb_attribute_to_dgl_feature(self, col: str, atrib: str, val):
         """
         Given an ArangoDB attribute, its value (for that document),
         and the collection it belongs to, convert it to a valid
@@ -45,7 +45,10 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         except:
             return 0
 
-    def _arangodb_key_to_integer(self, key: str) -> int:
+    def dgl_feature_to_adb_attribute(self, col: str, feature: str, val):
+        pass
+
+    def _adb_key_to_int(self, key: str) -> int:
         """Given an ArangoDB _key, derive its representing integer.
 
         If the string only contains numbers, convert to int.

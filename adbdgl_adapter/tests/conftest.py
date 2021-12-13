@@ -9,6 +9,9 @@ from pathlib import Path
 import urllib.request as urllib
 
 import dgl
+from dgl.data import KarateClubDataset
+from dgl.data import MiniGCDataset
+
 import torch
 from arango import ArangoClient
 from adbdgl_adapter.adbdgl_adapter import ArangoDB_DGL_Adapter
@@ -34,7 +37,6 @@ def pytest_sessionstart():
     adbdgl_adapter = ArangoDB_DGL_Adapter(conn)
 
     arango_restore("adbdgl_adapter/tests/data/fraud_dump")
-    # arango_restore("adbdgl_adapter/tests/data/imdb_dump")
 
     edge_definitions = [
         {
@@ -89,3 +91,19 @@ def print_connection_details(conn):
     print("Password: " + conn["password"])
     print("Database: " + conn["dbName"])
     print("----------------------------------------")
+
+
+def get_karate_graph():
+    return KarateClubDataset()[0]
+
+
+def get_lollipop_graph():
+    return dgl.remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
+
+
+def get_hypercube_graph():
+    return dgl.remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
+
+
+def get_clique_graph():
+    return dgl.remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])

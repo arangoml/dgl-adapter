@@ -4,6 +4,8 @@
 @author: Anthony Mahanna
 """
 
+from torch._C import StringType, Value
+from torch.functional import Tensor
 from .abc import ADBDGL_Adapter
 from .adbdgl_controller import Base_ADBDGL_Controller
 
@@ -13,9 +15,12 @@ from collections import defaultdict
 import dgl
 import torch
 
-from typing import Any, Union
+from typing import Any, Tuple, Union
 from dgl.heterograph import DGLHeteroGraph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
+
+from dgl import DGLGraph
+from arango.graph import Graph as ArangoDBGraph
 
 
 class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
@@ -117,6 +122,74 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
+    def dgl_to_arangodb(self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph]):
+        adb_v_cols = set()
+        adb_e_cols = set()
+        e_definitions = []
+
+        is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
+        if is_dgl_data:
+            e_col = name + "_" + self.DEFAULT_ETYPE
+            adb_e_cols.add(e_col)
+            from_col = to_col = name + "_" + self.DEFAULT_NTYPE
+            adb_v_cols.add(from_col)
+            e_definitions = self.etypes_to_edefinitions([(from_col, e_col, to_col)])
+        else:
+            adb_v_cols = set(dgl_g.ntypes)
+            adb_e_cols = set(dgl_g.etypes)
+            e_definitions = self.etypes_to_edefinitions(dgl_g.canonical_etypes)
+
+        adb_documents = defaultdict(list)
+        for v_col in adb_v_cols:
+            if self.__db.has_collection(v_col) is False:
+                self.__db.create_collection(v_col)
+
+            node: Tensor
+            for node in dgl_g.nodes(None if is_dgl_data else v_col):
+                id: int = node.item()
+                adb_documents[v_col].append({"_key": str(id)})
+
+        for e_col in adb_e_cols:
+            if self.__db.has_collection(e_col) is False:
+                self.__db.create_collection(e_col, edge=True)
+
+            from_nodes: Tensor
+            to_nodes: Tensor
+            from_nodes, to_nodes = dgl_g.edges(etype=None if is_dgl_data else e_col)
+
+            if is_dgl_data is False:
+                from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
+
+            for from_node, to_node in zip(from_nodes, to_nodes):
+                adb_documents[e_col].append(
+                    {
+                        "_from": f"{from_col}/{str(from_node.item())}",
+                        "_to": f"{to_col}/{str(to_node.item())}",
+                    }
+                )
+
+        self.__db.delete_graph(name, ignore_missing=True)
+        adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
+
+        for col, doc_list in adb_documents.items():  # insert remaining documents
+            self.__db.collection(col).import_bulk(doc_list, on_duplicate="replace")
+
+        print(f"ArangoDB: {name} created")
+        return adb_graph
+
+    def etypes_to_edefinitions(self, canonical_etypes: list) -> list:
+        edge_definitions = []
+        for dgl_from, dgl_e, dgl_to in canonical_etypes:
+            edge_definitions.append(
+                {
+                    "from_vertex_collections": [dgl_from],
+                    "edge_collection": dgl_e,
+                    "to_vertex_collections": [dgl_to],
+                }
+            )
+
+        return edge_definitions
+
     def __insert_dgl_features(
         self,
         features: defaultdict,
@@ -136,7 +209,8 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         for a in attributes:
             if a not in doc:
                 raise KeyError(f"{a} not in {doc['_id']}")
-            features[a][col].append(self.__cntrl.attribute_to_feature(col, a, doc[a]))
+            array: list = features[a][col]
+            array.append(self.__cntrl.adb_attribute_to_dgl_feature(col, a, doc[a]))
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.
