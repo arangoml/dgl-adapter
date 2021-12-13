@@ -5,6 +5,7 @@
 """
 
 from abc import ABC
+from os import pread
 
 
 class ADBDGL_Adapter(ABC):
@@ -42,23 +43,23 @@ class ADBDGL_Adapter(ABC):
         raise NotImplementedError()  # pragma: no cover
 
     @property
-    def DEFAULT_CANONICAL_ETYPE(self):
-        return [("_N", "_E", "_N")]
-
-    @property
     def DEFAULT_NTYPE(self):
-        return "N"
+        return "_N"
 
     @property
     def DEFAULT_ETYPE(self):
-        return "E"
+        return "_E"
+
+    @property
+    def DEFAULT_CANONICAL_ETYPE(self):
+        return [(self.DEFAULT_NTYPE, self.DEFAULT_ETYPE, self.DEFAULT_NTYPE)]
 
     @property
     def CONNECTION_ATRIBS(self):
         return {"hostname", "username", "password", "dbName"}
 
     @property
-    def GRAPH_ATRIBS(self):
+    def METAGRAPH_ATRIBS(self):
         return {"vertexCollections", "edgeCollections"}
 
     @property

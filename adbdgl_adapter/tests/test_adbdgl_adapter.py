@@ -45,7 +45,7 @@ def test_validate_controller_class():
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "adapter, name, attributes",
+    "adapter, name, metagraph",
     [
         (
             adbdgl_adapter,
@@ -69,30 +69,10 @@ def test_validate_controller_class():
         ),
     ],
 )
-def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, attributes: dict):
+def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, metagraph: dict):
     assert_adapter_type(adapter)
-    dgl_g = adapter.arangodb_to_dgl(name, attributes)
-
-    for col, atribs in attributes["vertexCollections"].items():
-        num_nodes = dgl_g.num_nodes(col)
-
-        assert num_nodes == db.collection(col).count()
-        for atrib in atribs:
-            assert atrib in dgl_g.ndata
-            assert col in dgl_g.ndata[atrib]
-            assert len(dgl_g.ndata[atrib][col]) == num_nodes
-
-    for col, atribs in attributes["edgeCollections"].items():
-        assert dgl_g.to_canonical_etype(col)
-
-        num_edges = dgl_g.num_edges(col)
-        assert num_edges == db.collection(col).count()
-
-        for atrib in atribs:
-            assert atrib in dgl_g.edata
-            tup_key = [tup for tup in dgl_g.canonical_etypes if col in tup][0]
-            assert tup_key in dgl_g.edata[atrib]
-            assert len(dgl_g.edata[atrib][tup_key]) == num_edges
+    dgl_g = adapter.arangodb_to_dgl(name, metagraph)
+    assert_dgl_data(dgl_g, metagraph["vertexCollections"], metagraph["edgeCollections"])
 
 
 @pytest.mark.unit
@@ -123,16 +103,11 @@ def test_adb_collections_to_dgl(
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "adapter, name, edge_definitions",
-    [(adbdgl_adapter, "fraud-detection", None)],
+    "adapter, name",
+    [(adbdgl_adapter, "fraud-detection")],
 )
-def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, edge_definitions):
+def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str):
     assert_adapter_type(adapter)
-
-    # Re-create the graph if defintions are provided
-    if edge_definitions:
-        db.delete_graph(name, ignore_missing=True)
-        db.create_graph(name, edge_definitions=edge_definitions)
 
     arango_graph = db.graph(name)
     v_cols = arango_graph.vertex_collections()
@@ -172,24 +147,22 @@ def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
 def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
     for col, atribs in v_cols.items():
         num_nodes = dgl_g.num_nodes(col)
-
         assert num_nodes == db.collection(col).count()
+
         for atrib in atribs:
             assert atrib in dgl_g.ndata
             assert col in dgl_g.ndata[atrib]
             assert len(dgl_g.ndata[atrib][col]) == num_nodes
 
     for col, atribs in e_cols.items():
-        assert dgl_g.to_canonical_etype(col)
-
         num_edges = dgl_g.num_edges(col)
         assert num_edges == db.collection(col).count()
 
+        canon_etype = dgl_g.to_canonical_etype(col)
         for atrib in atribs:
             assert atrib in dgl_g.edata
-            tup_key = [tup for tup in dgl_g.canonical_etypes if col in tup][0]
-            assert tup_key in dgl_g.edata[atrib]
-            assert len(dgl_g.edata[atrib][tup_key]) == num_edges
+            assert canon_etype in dgl_g.edata[atrib]
+            assert len(dgl_g.edata[atrib][canon_etype]) == num_edges
 
 
 def assert_arangodb_data(

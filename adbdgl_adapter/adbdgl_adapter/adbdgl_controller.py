@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from typing import Union
 from .abc import ADBDGL_Controller
 from collections import defaultdict
 

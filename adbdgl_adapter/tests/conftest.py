@@ -1,18 +1,14 @@
-import io
 import os
 import time
 import json
-import zipfile
 import requests
 import subprocess
 from pathlib import Path
-import urllib.request as urllib
 
-import dgl
+from dgl import remove_self_loop
 from dgl.data import KarateClubDataset
 from dgl.data import MiniGCDataset
 
-import torch
 from arango import ArangoClient
 from adbdgl_adapter.adbdgl_adapter import ArangoDB_DGL_Adapter
 
@@ -98,12 +94,12 @@ def get_karate_graph():
 
 
 def get_lollipop_graph():
-    return dgl.remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
+    return remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
 
 
 def get_hypercube_graph():
-    return dgl.remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
+    return remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
 
 
 def get_clique_graph():
-    return dgl.remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])
+    return remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])

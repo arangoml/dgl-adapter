@@ -4,23 +4,22 @@
 @author: Anthony Mahanna
 """
 
-from torch._C import StringType, Value
-from torch.functional import Tensor
 from .abc import ADBDGL_Adapter
 from .adbdgl_controller import Base_ADBDGL_Controller
 
 from arango import ArangoClient
-from collections import defaultdict
+from arango.graph import Graph as ArangoDBGraph
 
 import dgl
-import torch
-
-from typing import Any, Tuple, Union
+from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
 
-from dgl import DGLGraph
-from arango.graph import Graph as ArangoDBGraph
+import torch
+from torch.functional import Tensor
+
+from typing import Union
+from collections import defaultdict
 
 
 class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
@@ -43,6 +42,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         port = str(conn.get("port", 8529))
 
         url = protocol + "://" + host + ":" + port
+
         print(f"Connecting to {url}")
         self.__db = ArangoClient(hosts=url).db(db_name, username, password, verify=True)
         self.__cntrl: Base_ADBDGL_Controller = controller_class()
@@ -50,16 +50,16 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
     def arangodb_to_dgl(
         self,
         name: str,
-        graph_attributes: dict,
+        metagraph: dict,
         **query_options,
     ):
-        self.__validate_attributes("graph", set(graph_attributes), self.GRAPH_ATRIBS)
+        self.__validate_attributes("graph", set(metagraph), self.METAGRAPH_ATRIBS)
 
         data_dict = {}
         ndata = defaultdict(lambda: defaultdict(list))
         edata = defaultdict(lambda: defaultdict(list))
 
-        for v_col, atribs in graph_attributes["vertexCollections"].items():
+        for v_col, atribs in metagraph["vertexCollections"].items():
             node_id = 0
             for v in self.__fetch_adb_docs(v_col, atribs, query_options):
                 self.__cntrl.adb_map[v["_id"]] = {
@@ -72,7 +72,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         from_col = set()
         to_col = set()
-        for e_col, atribs in graph_attributes["edgeCollections"].items():
+        for e_col, atribs in metagraph["edgeCollections"].items():
             from_nodes = []
             to_nodes = []
             for e in self.__fetch_adb_docs(e_col, atribs, query_options):
@@ -81,8 +81,10 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
                 from_col.add(from_node["collection"])
                 to_col.add(to_node["collection"])
-                if len(from_col) > 1 or len(to_col) > 1:
-                    raise ValueError(f"too many '_from' & '_to' collections in {e_col}")
+                if len(from_col | to_col) > 2:
+                    raise ValueError(
+                        f"Can't convert to DGL: too many '_from' & '_to' collections in {e_col}"
+                    )
 
                 from_nodes.append(from_node["id"])
                 to_nodes.append(to_node["id"])
@@ -108,12 +110,12 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         edge_collections: set,
         **query_options,
     ):
-        graph_attributes = {
+        metagraph = {
             "vertexCollections": {col: {} for col in vertex_collections},
             "edgeCollections": {col: {} for col in edge_collections},
         }
 
-        return self.arangodb_to_dgl(name, graph_attributes, **query_options)
+        return self.arangodb_to_dgl(name, metagraph, **query_options)
 
     def arangodb_graph_to_dgl(self, name: str, **query_options):
         graph = self.__db.graph(name)
@@ -123,21 +125,20 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
     def dgl_to_arangodb(self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph]):
-        adb_v_cols = set()
-        adb_e_cols = set()
-        e_definitions = []
-
         is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
-        if is_dgl_data:
-            e_col = name + "_" + self.DEFAULT_ETYPE
-            adb_e_cols.add(e_col)
-            from_col = to_col = name + "_" + self.DEFAULT_NTYPE
-            adb_v_cols.add(from_col)
-            e_definitions = self.etypes_to_edefinitions([(from_col, e_col, to_col)])
-        else:
-            adb_v_cols = set(dgl_g.ntypes)
-            adb_e_cols = set(dgl_g.etypes)
-            e_definitions = self.etypes_to_edefinitions(dgl_g.canonical_etypes)
+        adb_v_cols = [name + self.DEFAULT_NTYPE] if is_dgl_data else dgl_g.ntypes
+        adb_e_cols = [name + self.DEFAULT_ETYPE] if is_dgl_data else dgl_g.etypes
+        e_definitions = self.etypes_to_edefinitions(
+            [
+                (
+                    adb_v_cols[0],
+                    adb_e_cols[0],
+                    adb_v_cols[0],
+                )
+            ]
+            if is_dgl_data
+            else dgl_g.canonical_etypes
+        )
 
         adb_documents = defaultdict(list)
         for v_col in adb_v_cols:
@@ -157,7 +158,9 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             to_nodes: Tensor
             from_nodes, to_nodes = dgl_g.edges(etype=None if is_dgl_data else e_col)
 
-            if is_dgl_data is False:
+            if is_dgl_data:
+                from_col = to_col = adb_v_cols[0]
+            else:
                 from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
 
             for from_node, to_node in zip(from_nodes, to_nodes):
