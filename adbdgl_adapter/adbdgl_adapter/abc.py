@@ -24,6 +24,9 @@ class ADBDGL_Adapter(ABC):
     def dgl_to_arangodb(self):
         raise NotImplementedError()  # pragma: no cover
 
+    def etypes_to_edefinitions(self):
+        raise NotImplementedError()  # pragma: no cover
+
     def __validate_attributes(self):
         raise NotImplementedError()  # pragma: no cover
 
@@ -36,10 +39,10 @@ class ADBDGL_Adapter(ABC):
     def __insert_adb_edge(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def __insert_dgl_node(self):
+    def __prepare_dgl_features(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def __insert_dgl_edge(self):
+    def __insert_dgl_features(self):
         raise NotImplementedError()  # pragma: no cover
 
     @property

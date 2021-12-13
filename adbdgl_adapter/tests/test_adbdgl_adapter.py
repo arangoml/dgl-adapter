@@ -121,12 +121,12 @@ def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, is_dgl_data",
+    "adapter, name, dgl_g, is_dgl_data, batch_size",
     [
-        (adbdgl_adapter, "Karate", get_karate_graph(), True),
-        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), True),
-        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), True),
-        (adbdgl_adapter, "Clique", get_clique_graph(), True),
+        (adbdgl_adapter, "Clique", get_clique_graph(), True, 3),
+        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), True, 1000),
+        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), True, 1000),
+        (adbdgl_adapter, "Karate", get_karate_graph(), True, 1000),
     ],
 )
 def test_dgl_to_adb(
@@ -134,10 +134,11 @@ def test_dgl_to_adb(
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     is_dgl_data: bool,
+    batch_size: int,
 ):
     assert_adapter_type(adapter)
-    adb_g = adapter.dgl_to_arangodb(name, dgl_g)
-    assert_arangodb_data(name, dgl_g, adb_g, is_dgl_data)
+    adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
+    assert_arangodb_data(adapter, name, dgl_g, adb_g, is_dgl_data)
 
 
 def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
@@ -167,12 +168,13 @@ def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
 
 def assert_arangodb_data(
     name: str,
+    adapter: ArangoDB_DGL_Adapter,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
     is_dgl_data: bool,
 ):
     for dgl_v_col in dgl_g.ntypes:
-        adb_v_col = f"{name}_N" if is_dgl_data else dgl_v_col
+        adb_v_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_v_col
         col = adb_g.vertex_collection(adb_v_col)
 
         node: Tensor
@@ -182,9 +184,9 @@ def assert_arangodb_data(
     for dgl_e_col in dgl_g.etypes:
         dgl_from_col, _, dgl_to_col = dgl_g.to_canonical_etype(dgl_e_col)
 
-        adb_e_col = f"{name}_E" if is_dgl_data else dgl_e_col
-        adb_from_col = f"{name}_N" if is_dgl_data else dgl_from_col
-        adb_to_col = f"{name}_N" if is_dgl_data else dgl_to_col
+        adb_e_col = name + adapter.DEFAULT_ETYPE if is_dgl_data else dgl_e_col
+        adb_from_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_from_col
+        adb_to_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_to_col
 
         col = adb_g.edge_collection(adb_e_col)
 

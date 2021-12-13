@@ -124,7 +124,9 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
-    def dgl_to_arangodb(self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph]):
+    def dgl_to_arangodb(
+        self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int = 1000
+    ):
         is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
         adb_v_cols = [name + self.DEFAULT_NTYPE] if is_dgl_data else dgl_g.ntypes
         adb_e_cols = [name + self.DEFAULT_ETYPE] if is_dgl_data else dgl_g.etypes
@@ -142,15 +144,25 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         adb_documents = defaultdict(list)
         for v_col in adb_v_cols:
+            v_col_docs = adb_documents[v_col]
+
             if self.__db.has_collection(v_col) is False:
                 self.__db.create_collection(v_col)
 
             node: Tensor
             for node in dgl_g.nodes(None if is_dgl_data else v_col):
                 id: int = node.item()
-                adb_documents[v_col].append({"_key": str(id)})
+                v_col_docs.append({"_key": str(id)})  # TODO: Import Node Features
+
+                if len(v_col_docs) >= batch_size:
+                    self.__db.collection(v_col).import_bulk(
+                        v_col_docs, on_duplicate="replace"
+                    )
+                    v_col_docs.clear()
 
         for e_col in adb_e_cols:
+            e_col_docs = adb_documents[e_col]
+
             if self.__db.has_collection(e_col) is False:
                 self.__db.create_collection(e_col, edge=True)
 
@@ -164,12 +176,18 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
 
             for from_node, to_node in zip(from_nodes, to_nodes):
-                adb_documents[e_col].append(
+                e_col_docs.append(
                     {
                         "_from": f"{from_col}/{str(from_node.item())}",
-                        "_to": f"{to_col}/{str(to_node.item())}",
+                        "_to": f"{to_col}/{str(to_node.item())}",  # TODO: Import Edge Features
                     }
                 )
+
+                if len(e_col_docs) >= batch_size:
+                    self.__db.collection(e_col).import_bulk(
+                        e_col_docs, on_duplicate="replace"
+                    )
+                    e_col_docs.clear()
 
         self.__db.delete_graph(name, ignore_missing=True)
         adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
