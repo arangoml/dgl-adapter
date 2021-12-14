@@ -67,7 +67,7 @@ def arango_restore(path_to_data):
     restore_prefix = "./" if os.getenv("GITHUB_ACTIONS") else ""  # temporary hack
 
     subprocess.check_call(
-        f'chmod -R 755 ./arangorestore && {restore_prefix}arangorestore -c none --server.endpoint http+ssl://{conn["hostname"]}:{conn["port"]} --server.username {conn["username"]} --server.database {conn["dbName"]} --server.password {conn["password"]} --input-directory "{PROJECT_DIR}/{path_to_data}"',
+        f'chmod -R 755 ./arangorestore && {restore_prefix}arangorestore --include-system-collections true --server.endpoint http+ssl://{conn["hostname"]}:{conn["port"]} --server.username {conn["username"]} --server.database {conn["dbName"]} --server.password {conn["password"]} --input-directory "{PROJECT_DIR}/{path_to_data}"',
         cwd=f"{PROJECT_DIR}/adbdgl_adapter/tests",
         shell=True,
     )
