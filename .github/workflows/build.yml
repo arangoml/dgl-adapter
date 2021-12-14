@@ -1,6 +1,9 @@
-
 name: build
-on: [push]
+on:
+  pull_request:
+    paths:
+      - "adbdgl_adapter/adbdgl_adapter/**"
+      - "adbdgl_adapter/tests/**"
 env:
   SOURCE_DIR: adbdgl_adapter
   PACKAGE_DIR: adbdgl_adapter
@@ -29,6 +32,8 @@ jobs:
           options: "--check --verbose --diff --color"
           src: ${{env.PACKAGE_DIR}}
       - name: Install dependencies
-        run: pip install -e . pytest
+        run: pip install -e . pytest pytest-cov coveralls
       - name: Run pytest
-        run: pytest -v --color=yes --code-highlight=yes
+        run: |
+          pytest --cov=${{env.PACKAGE_DIR}} --cov-report term-missing -v --color=yes --no-cov-on-fail --code-highlight=yes
+          coveralls
