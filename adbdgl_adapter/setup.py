@@ -21,7 +21,6 @@ setup(
     license="Apache Software License",
     install_requires=[
         "python-arango==7.2.0",
-        "networkx>=2.5.1,<=2.6.3",
         "torch==1.10.0",
         "dgl==0.6.1",
     ],
