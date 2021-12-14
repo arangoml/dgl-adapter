@@ -63,9 +63,6 @@ class ADBDGL_Adapter(ABC):
 
 
 class ADBDGL_Controller(ABC):
-    def __init__(self):
-        raise NotImplementedError()  # pragma: no cover
-
     def _prepare_arangodb_vertex(self):
         raise NotImplementedError()  # pragma: no cover
 

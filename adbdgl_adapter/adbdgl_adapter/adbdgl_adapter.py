@@ -55,18 +55,19 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
     ):
         self.__validate_attributes("graph", set(metagraph), self.METAGRAPH_ATRIBS)
 
-        data_dict = {}
+        adb_map = dict()  # Maps ArangoDB vertex IDs to DGL node IDs
+
+        # Dictionaries for constructing a heterogeneous graph.
+        data_dict = dict()
         ndata = defaultdict(lambda: defaultdict(list))
         edata = defaultdict(lambda: defaultdict(list))
 
         for v_col, atribs in metagraph["vertexCollections"].items():
-            node_id = 0  # TODO: replace node_id with enumerate(fetch_adb_docs) ???
-            for v in self.__fetch_adb_docs(v_col, atribs, query_options):
-                self.__cntrl.adb_map[v["_id"]] = {
-                    "id": node_id,
-                    "collection": v_col,
+            for i, v in enumerate(self.__fetch_adb_docs(v_col, atribs, query_options)):
+                adb_map[v["_id"]] = {
+                    "id": i,
+                    "col": v_col,
                 }
-                node_id += 1
 
                 self.__prepare_dgl_features(ndata, v_col, atribs, v)
 
@@ -76,11 +77,11 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             from_nodes = []
             to_nodes = []
             for e in self.__fetch_adb_docs(e_col, atribs, query_options):
-                from_node = self.__cntrl.adb_map[e["_from"]]
-                to_node = self.__cntrl.adb_map[e["_to"]]
+                from_node = adb_map[e["_from"]]
+                to_node = adb_map[e["_to"]]
 
-                from_col.add(from_node["collection"])
-                to_col.add(to_node["collection"])
+                from_col.add(from_node["col"])
+                to_col.add(to_node["col"])
                 if len(from_col | to_col) > 2:
                     raise ValueError(
                         f"Can't convert to DGL: too many '_from' & '_to' collections in {e_col}"
@@ -96,12 +97,15 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 torch.tensor(to_nodes),
             )
 
-        dgl_graph: DGLHeteroGraph = dgl.heterograph(data_dict)
-        self.__insert_dgl_features(ndata, dgl_graph.ndata)
-        self.__insert_dgl_features(edata, dgl_graph.edata)
+        dgl_g: DGLHeteroGraph = dgl.heterograph(data_dict)
+        has_one_ntype = len(dgl_g.ntypes) == 1
+        has_one_etype = len(dgl_g.etypes) == 1
+
+        self.__insert_dgl_features(ndata, dgl_g.ndata, has_one_ntype)
+        self.__insert_dgl_features(edata, dgl_g.edata, has_one_etype)
 
         print(f"DGL: {name} created")
-        return dgl_graph
+        return dgl_g
 
     def arangodb_collections_to_dgl(
         self,
@@ -236,40 +240,43 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
     def __prepare_dgl_features(
         self,
-        features: defaultdict,
+        features_data: defaultdict,
         col: str,
         attributes: set,
         doc: dict,
     ):
-        for a in attributes:
-            if a not in doc:
-                raise KeyError(f"{a} not in {doc['_id']}")
-            array: list = features[a][col]
-            array.append(self.__cntrl.adb_attribute_to_dgl_feature(col, a, doc[a]))
+        key: str
+        for key in attributes:
+            arr: list = features_data[key][col]
+            arr.append(self.__cntrl.adb_attribute_to_dgl_feature(key, col, doc[key]))
 
     def __insert_dgl_features(
         self,
-        features: defaultdict,
+        features_data: defaultdict,
         data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+        has_one_type: bool,
     ):
-        for key, col_dict in features.items():
+        col_dict: dict
+        for key, col_dict in features_data.items():
             for col, array in col_dict.items():
-                data[key] = {**data[key], col: torch.tensor(array)}
+                data[key] = (
+                    torch.tensor(array)
+                    if has_one_type
+                    else {**data[key], col: torch.tensor(array)}
+                )
 
     def __prepare_adb_attributes(
         self,
         data: HeteroNodeDataView,
-        feature_keys: dict,
+        features: dict,
         id: int,
         doc: dict,
         col: str,
         has_one_type: bool,
     ):
-        for key in feature_keys:
+        for key in features:
             tensor = data[key] if has_one_type else data[key][col]
-            doc[key] = self.__cntrl.dgl_feature_to_adb_attribute(
-                col, key, tensor[id].item()
-            )
+            doc[key] = self.__cntrl.dgl_feature_to_adb_attribute(key, col, tensor[id])
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.

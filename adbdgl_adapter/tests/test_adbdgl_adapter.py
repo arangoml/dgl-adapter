@@ -68,6 +68,18 @@ def test_validate_controller_class():
                 },
             },
         ),
+        # (
+        #     adbdgl_adapter,
+        #     "temp",
+        #     {
+        #         "vertexCollections": {
+        #             "temp": {"data"},
+        #         },
+        #         "edgeCollections": {
+        #             "tempEdge": {"data"},
+        #         },
+        #     },
+        # ),
     ],
 )
 def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, metagraph: dict):
@@ -147,14 +159,20 @@ def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
 
 
 def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
+    has_one_ntype = len(v_cols) == 1
+    has_one_etype = len(e_cols) == 1
+
     for col, atribs in v_cols.items():
         num_nodes = dgl_g.num_nodes(col)
         assert num_nodes == db.collection(col).count()
 
         for atrib in atribs:
             assert atrib in dgl_g.ndata
-            assert col in dgl_g.ndata[atrib]
-            assert len(dgl_g.ndata[atrib][col]) == num_nodes
+            if has_one_ntype:
+                assert len(dgl_g.ndata[atrib]) == num_nodes
+            else:
+                assert col in dgl_g.ndata[atrib]
+                assert len(dgl_g.ndata[atrib][col]) == num_nodes
 
     for col, atribs in e_cols.items():
         num_edges = dgl_g.num_edges(col)
@@ -163,8 +181,11 @@ def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
         canon_etype = dgl_g.to_canonical_etype(col)
         for atrib in atribs:
             assert atrib in dgl_g.edata
-            assert canon_etype in dgl_g.edata[atrib]
-            assert len(dgl_g.edata[atrib][canon_etype]) == num_edges
+            if has_one_etype:
+                assert len(dgl_g.edata[atrib]) == num_edges
+            else:
+                assert canon_etype in dgl_g.edata[atrib]
+                assert len(dgl_g.edata[atrib][canon_etype]) == num_edges
 
 
 def assert_arangodb_data(
