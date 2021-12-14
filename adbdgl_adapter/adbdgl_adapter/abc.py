@@ -5,7 +5,6 @@
 """
 
 from abc import ABC
-from os import pread
 
 
 class ADBDGL_Adapter(ABC):
@@ -27,22 +26,19 @@ class ADBDGL_Adapter(ABC):
     def etypes_to_edefinitions(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def __validate_attributes(self):
+    def __prepare_dgl_features(self):
+        raise NotImplementedError()  # pragma: no cover
+
+    def __insert_dgl_features(self):
+        raise NotImplementedError()  # pragma: no cover
+
+    def __prepare_adb_attributes(self):
         raise NotImplementedError()  # pragma: no cover
 
     def __fetch_adb_docs(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def __insert_adb_vertex(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def __insert_adb_edge(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def __prepare_dgl_features(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def __insert_dgl_features(self):
+    def __validate_attributes(self):
         raise NotImplementedError()  # pragma: no cover
 
     @property
@@ -63,41 +59,8 @@ class ADBDGL_Adapter(ABC):
 
 
 class ADBDGL_Controller(ABC):
-    def _prepare_arangodb_vertex(self):
+    def _adb_attribute_to_dgl_feature(self):
         raise NotImplementedError()  # pragma: no cover
 
-    def _prepare_arangodb_edge(self):
+    def _dgl_feature_to_adb_attribute(self):
         raise NotImplementedError()  # pragma: no cover
-
-    def _identify_dgl_node(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def _identify_dgl_edge(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def _keyify_dgl_node(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    def _keyify_dgl_edge(self):
-        raise NotImplementedError()  # pragma: no cover
-
-    @property
-    def VALID_KEY_CHARS(self):
-        return {
-            "_",
-            "-",
-            ":",
-            ".",
-            "@",
-            "(",
-            ")",
-            "+",
-            ",",
-            "=",
-            ";",
-            "$",
-            "!",
-            "*",
-            "'",
-            "%",
-        }

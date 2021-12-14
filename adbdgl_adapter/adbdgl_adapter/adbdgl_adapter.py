@@ -23,6 +23,15 @@ from collections import defaultdict
 
 
 class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
+    """ArangoDB-DGL adapter.
+
+    :param conn: Connection details to an ArangoDB instance.
+    :type conn: dict
+    :param controller_class: The ArangoDB-DGL controller, for controlling how ArangoDB attributes are converted into DGL features, and vice-versa. Optionally re-defined by the user if needed (otherwise defaults to Base_ADBDGL_Controller).
+    :type controller_class: Base_ADBDGL_Controller
+    :raise ValueError: If missing required keys in conn
+    """
+
     def __init__(
         self,
         conn: dict,
@@ -53,6 +62,33 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         metagraph: dict,
         **query_options,
     ):
+        """Create a DGL graph from user-defined metagraph.
+
+        :param name: The DGL graph name.
+        :type name: str
+        :param metagraph: An object defining vertex & edge collections to import to DGL, along with their associated attributes to keep.
+        :type metagraph: dict
+        :param query_options: Keyword arguments to specify AQL query options when fetching documents from the ArangoDB instance.
+        :type query_options: **kwargs
+        :return: A DGL Heterograph
+        :rtype: dgl.heterograph.DGLHeteroGraph
+        :raise ValueError: If missing required keys in metagraph
+
+        Here is an example entry for parameter **metagraph**:
+
+        .. code-block:: python
+        {
+            "vertexCollections": {
+                "account": {"Balance", "account_type", "customer_id", "rank"},
+                "bank": {"Country", "Id", "bank_id", "bank_name"},
+                "customer": {"Name", "Sex", "Ssn", "rank"},
+            },
+            "edgeCollections": {
+                "accountHolder": {},
+                "transaction": {},
+            },
+        }
+        """
         self.__validate_attributes("graph", set(metagraph), self.METAGRAPH_ATRIBS)
 
         adb_map = dict()  # Maps ArangoDB vertex IDs to DGL node IDs
@@ -69,7 +105,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     "col": v_col,
                 }
 
-                self.__prepare_dgl_features(ndata, v_col, atribs, v)
+                self.__prepare_dgl_features(ndata, atribs, v, v_col)
 
         from_col = set()
         to_col = set()
@@ -90,7 +126,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 from_nodes.append(from_node["id"])
                 to_nodes.append(to_node["id"])
 
-                self.__prepare_dgl_features(edata, e_col, atribs, e)
+                self.__prepare_dgl_features(edata, atribs, e, e_col)
 
             data_dict[(from_col.pop(), e_col, to_col.pop())] = (
                 torch.tensor(from_nodes),
@@ -114,6 +150,19 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         edge_collections: set,
         **query_options,
     ):
+        """Create a DGL graph from ArangoDB collections.
+
+        :param name: The DGL graph name.
+        :type name: str
+        :param vertex_collections: A set of ArangoDB vertex collections to import to DGL.
+        :type vertex_collections: set
+        :param edge_collections: A set of ArangoDB edge collections to import to DGL.
+        :type edge_collections: set
+        :param query_options: Keyword arguments to specify AQL query options when fetching documents from the ArangoDB instance.
+        :type query_options: **kwargs
+        :return: A DGL Heterograph
+        :rtype: dgl.heterograph.DGLHeteroGraph
+        """
         metagraph = {
             "vertexCollections": {col: {} for col in vertex_collections},
             "edgeCollections": {col: {} for col in edge_collections},
@@ -122,6 +171,15 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         return self.arangodb_to_dgl(name, metagraph, **query_options)
 
     def arangodb_graph_to_dgl(self, name: str, **query_options):
+        """Create a DGL graph from an ArangoDB graph.
+
+        :param name: The ArangoDB graph name.
+        :type name: str
+        :param query_options: Keyword arguments to specify AQL query options when fetching documents from the ArangoDB instance.
+        :type query_options: **kwargs
+        :return: A DGL Heterograph
+        :rtype: dgl.heterograph.DGLHeteroGraph
+        """
         graph = self.__db.graph(name)
         v_cols = graph.vertex_collections()
         e_cols = {col["edge_collection"] for col in graph.edge_definitions()}
@@ -131,6 +189,17 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
     def dgl_to_arangodb(
         self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int = 1000
     ):
+        """Create an ArangoDB graph from a DGL graph.
+
+        :param name: The ArangoDB graph name.
+        :type name: str
+        :param dgl_g: The existing DGL graph.
+        :type dgl_g: Union[dgl.DGLGraph, dgl.heterograph.DGLHeteroGraph]
+        :param batch_size: The maximum number of documents to insert at once
+        :type batch_size: int
+        :return: The ArangoDB Graph API wrapper.
+        :rtype: arango.graph.Graph
+        """
         is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
         adb_v_cols = [name + dgl_g.ntypes[0]] if is_dgl_data else dgl_g.ntypes
         adb_e_cols = [name + dgl_g.etypes[0]] if is_dgl_data else dgl_g.etypes
@@ -168,7 +237,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     v_col,
                     has_one_ntype,
                 )
-                v_col_docs.append(vertex)  # TODO: Import Node Features
+                v_col_docs.append(vertex)
 
                 if len(v_col_docs) >= batch_size:
                     self.__db.collection(v_col).import_bulk(
@@ -198,7 +267,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 edge = {
                     "_key": str(dgl_edge_id),
                     "_from": f"{from_col}/{str(from_node.item())}",
-                    "_to": f"{to_col}/{str(to_node.item())}",  # TODO: Import Edge Features
+                    "_to": f"{to_col}/{str(to_node.item())}",
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
@@ -226,6 +295,24 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         return adb_graph
 
     def etypes_to_edefinitions(self, canonical_etypes: list) -> list:
+        """Converts a DGL graph's canonical_etypes property to ArangoDB graph edge definitions
+
+        :param canonical_etypes: A list of string triplets (str, str, str) for source node type, edge type and destination node type.
+        :type canonical_etypes: list[tuple]
+        :return: ArangoDB Edge Definitions
+        :rtype: list[dict[str, Union[str, list[str]]]]
+
+        Here is an example of **edge_definitions**:
+
+        .. code-block:: python
+        [
+            {
+                "edge_collection": "teach",
+                "from_vertex_collections": ["teachers"],
+                "to_vertex_collections": ["lectures"]
+            }
+        ]
+        """
         edge_definitions = []
         for dgl_from, dgl_e, dgl_to in canonical_etypes:
             edge_definitions.append(
@@ -241,14 +328,26 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
     def __prepare_dgl_features(
         self,
         features_data: defaultdict,
-        col: str,
         attributes: set,
         doc: dict,
+        col: str,
     ):
+        """Convert a set of ArangoDB attributes into valid DGL features
+
+        :param features_data: A dictionary storing the DGL features formatted as lists.
+        :type features_data: defaultdict[Any, defaultdict[Any, list]]
+        :param col: The collection the current document belongs to
+        :type col: str
+        :param attributes: A set of ArangoDB attribute keys to convert into DGL features
+        :type attributes: set
+        :param doc: The current ArangoDB document
+        :type doc: dict
+
+        """
         key: str
         for key in attributes:
             arr: list = features_data[key][col]
-            arr.append(self.__cntrl.adb_attribute_to_dgl_feature(key, col, doc[key]))
+            arr.append(self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc[key]))
 
     def __insert_dgl_features(
         self,
@@ -256,6 +355,15 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         data: Union[HeteroNodeDataView, HeteroEdgeDataView],
         has_one_type: bool,
     ):
+        """Insert valid DGL features into a DGL graph.
+
+        :param features_data: A dictionary storing the DGL features formatted as lists.
+        :type features_data: defaultdict[Any, defaultdict[Any, list]]
+        :param data: The (empty) ndata or edata instance attribute of a dgl graph, which is about to receive the **features_data**.
+        :type data: Union[HeteroNodeDataView, HeteroEdgeDataView]
+        :param has_one_type: Set to True if the DGL graph only has one ntype, or one etype.
+        :type has_one_type: bool
+        """
         col_dict: dict
         for key, col_dict in features_data.items():
             for col, array in col_dict.items():
@@ -267,16 +375,31 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
     def __prepare_adb_attributes(
         self,
-        data: HeteroNodeDataView,
-        features: dict,
+        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+        features: set,
         id: int,
         doc: dict,
         col: str,
         has_one_type: bool,
     ):
+        """Convert DGL features into a set of ArangoDB attributes for a given document
+
+        :param data: The ndata or edata instance attribute of a dgl graph, filled with node or edge feature data.
+        :type data: Union[HeteroNodeDataView, HeteroEdgeDataView]
+        :param features: A set of DGL feature keys to convert into ArangoDB attributes
+        :type features: set
+        :param id: The ID of the current DGL node / edge
+        :type id: int
+        :param doc: The current ArangoDB document
+        :type doc: dict
+        :param col: The collection the current document belongs to
+        :type col: str
+        :param has_one_type: Set to True if the DGL graph only has one ntype, or one etype.
+        :type has_one_type: bool
+        """
         for key in features:
             tensor = data[key] if has_one_type else data[key][col]
-            doc[key] = self.__cntrl.dgl_feature_to_adb_attribute(key, col, tensor[id])
+            doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.

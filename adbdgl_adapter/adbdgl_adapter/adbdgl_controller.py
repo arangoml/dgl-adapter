@@ -17,7 +17,7 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
     are converted into DGL features, and vice-versa.
     """
 
-    def adb_attribute_to_dgl_feature(self, key: str, col: str, val):
+    def _adb_attribute_to_dgl_feature(self, key: str, col: str, val):
         """
         Given an ArangoDB attribute key, its assigned value (for an arbitrary document),
         and the collection it belongs to, convert it to a valid
@@ -36,7 +36,7 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         # if atrib == "Ssn":
         #     return int(str(val).replace("-", ""))
 
-    def dgl_feature_to_adb_attribute(self, key: str, col: str, val: Tensor):
+    def _dgl_feature_to_adb_attribute(self, key: str, col: str, val: Tensor):
         """
         Given a DGL feature key, its assigned value (for an arbitrary node or edge),
         and the collection it belongs to, convert it to a valid ArangoDB attribute (e.g string, list, number, ...).
