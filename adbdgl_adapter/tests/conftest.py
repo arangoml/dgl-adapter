@@ -43,6 +43,21 @@ def pytest_sessionstart():
 
     client = ArangoClient(hosts=url)
     db = client.db(conn["dbName"], conn["username"], conn["password"], verify=True)
+    db.create_graph(
+        "fraud-detection",
+        edge_definitions=[
+            {
+                "edge_collection": "accountHolder",
+                "from_vertex_collections": ["customer"],
+                "to_vertex_collections": ["account"],
+            },
+            {
+                "edge_collection": "transaction",
+                "from_vertex_collections": ["account"],
+                "to_vertex_collections": ["account"],
+            },
+        ],
+    )
 
     # for g in db.graphs():
     #     db.delete_graph(g['name'])
@@ -67,7 +82,7 @@ def arango_restore(path_to_data):
     restore_prefix = "./" if os.getenv("GITHUB_ACTIONS") else ""  # temporary hack
 
     subprocess.check_call(
-        f'chmod -R 755 ./arangorestore && {restore_prefix}arangorestore --include-system-collections true --server.endpoint http+ssl://{conn["hostname"]}:{conn["port"]} --server.username {conn["username"]} --server.database {conn["dbName"]} --server.password {conn["password"]} --input-directory "{PROJECT_DIR}/{path_to_data}"',
+        f'chmod -R 755 ./arangorestore && {restore_prefix}arangorestore --server.endpoint http+ssl://{conn["hostname"]}:{conn["port"]} --server.username {conn["username"]} --server.database {conn["dbName"]} --server.password {conn["password"]} --input-directory "{PROJECT_DIR}/{path_to_data}"',
         cwd=f"{PROJECT_DIR}/adbdgl_adapter/tests",
         shell=True,
     )
