@@ -16,6 +16,7 @@ from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
 from arango.graph import Graph as ArangoGraph
 
+import torch
 from torch.functional import Tensor
 
 
@@ -138,7 +139,7 @@ def test_dgl_to_adb(
 ):
     assert_adapter_type(adapter)
     adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
-    assert_arangodb_data(adapter, name, dgl_g, adb_g, is_dgl_data)
+    assert_arangodb_data(name, dgl_g, adb_g, is_dgl_data)
 
 
 def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
@@ -167,26 +168,30 @@ def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
 
 
 def assert_arangodb_data(
-    adapter: ArangoDB_DGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
     is_dgl_data: bool,
 ):
     for dgl_v_col in dgl_g.ntypes:
-        adb_v_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_v_col
+        adb_v_col = name + dgl_v_col if is_dgl_data else dgl_v_col
+        attributes = dgl_g.node_attr_schemes(None if is_dgl_data else dgl_v_col).keys()
         col = adb_g.vertex_collection(adb_v_col)
 
         node: Tensor
         for node in dgl_g.nodes(dgl_v_col):
-            assert col.has(str(node.item()))
+            vertex = col.get(str(node.item()))
+            assert vertex
+            for atrib in attributes:
+                assert atrib in vertex
 
     for dgl_e_col in dgl_g.etypes:
         dgl_from_col, _, dgl_to_col = dgl_g.to_canonical_etype(dgl_e_col)
+        attributes = dgl_g.edge_attr_schemes(None if is_dgl_data else dgl_e_col).keys()
 
-        adb_e_col = name + adapter.DEFAULT_ETYPE if is_dgl_data else dgl_e_col
-        adb_from_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_from_col
-        adb_to_col = name + adapter.DEFAULT_NTYPE if is_dgl_data else dgl_to_col
+        adb_e_col = name + dgl_e_col if is_dgl_data else dgl_e_col
+        adb_from_col = name + dgl_v_col if is_dgl_data else dgl_from_col
+        adb_to_col = name + dgl_v_col if is_dgl_data else dgl_to_col
 
         col = adb_g.edge_collection(adb_e_col)
 
@@ -194,9 +199,12 @@ def assert_arangodb_data(
         to_node: Tensor
         from_nodes, to_nodes = dgl_g.edges(etype=dgl_e_col)
         for from_node, to_node in zip(from_nodes, to_nodes):
-            assert col.find(
+            edge = col.find(
                 {
                     "_from": f"{adb_from_col}/{str(from_node.item())}",
                     "_to": f"{adb_to_col}/{str(to_node.item())}",
                 }
-            )
+            ).next()
+            assert edge
+            for atrib in attributes:
+                assert atrib in edge

@@ -46,16 +46,8 @@ class ADBDGL_Adapter(ABC):
         raise NotImplementedError()  # pragma: no cover
 
     @property
-    def DEFAULT_NTYPE(self):
-        return "_N"
-
-    @property
-    def DEFAULT_ETYPE(self):
-        return "_E"
-
-    @property
     def DEFAULT_CANONICAL_ETYPE(self):
-        return [(self.DEFAULT_NTYPE, self.DEFAULT_ETYPE, self.DEFAULT_NTYPE)]
+        return [("_N", "_E", "_N")]
 
     @property
     def CONNECTION_ATRIBS(self):

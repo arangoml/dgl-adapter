@@ -5,6 +5,7 @@ import requests
 import subprocess
 from pathlib import Path
 
+import torch
 from dgl import remove_self_loop
 from dgl.data import KarateClubDataset
 from dgl.data import MiniGCDataset
@@ -29,8 +30,6 @@ def pytest_sessionstart():
     print_connection_details(conn)
     time.sleep(5)  # Enough for the oasis instance to be ready.
 
-    arango_restore("adbdgl_adapter/tests/data/fraud_dump")
-
     global adbdgl_adapter
     adbdgl_adapter = ArangoDB_DGL_Adapter(conn)
 
@@ -44,6 +43,8 @@ def pytest_sessionstart():
     )
     client = ArangoClient(hosts=url)
     db = client.db(conn["dbName"], conn["username"], conn["password"], verify=True)
+
+    arango_restore("adbdgl_adapter/tests/data/fraud_dump")
     db.create_graph(
         "fraud-detection",
         edge_definitions=[
@@ -94,12 +95,21 @@ def get_karate_graph():
 
 
 def get_lollipop_graph():
-    return remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
+    dgl_g = remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
+    dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
+    dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
+    return dgl_g
 
 
 def get_hypercube_graph():
-    return remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
+    dgl_g = remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
+    dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
+    dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
+    return dgl_g
 
 
 def get_clique_graph():
-    return remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])
+    dgl_g = remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])
+    dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
+    dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
+    return dgl_g

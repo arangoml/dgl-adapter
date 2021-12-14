@@ -60,7 +60,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         edata = defaultdict(lambda: defaultdict(list))
 
         for v_col, atribs in metagraph["vertexCollections"].items():
-            node_id = 0
+            node_id = 0  # TODO: replace node_id with enumerate(fetch_adb_docs) ???
             for v in self.__fetch_adb_docs(v_col, atribs, query_options):
                 self.__cntrl.adb_map[v["_id"]] = {
                     "id": node_id,
@@ -128,8 +128,8 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int = 1000
     ):
         is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
-        adb_v_cols = [name + self.DEFAULT_NTYPE] if is_dgl_data else dgl_g.ntypes
-        adb_e_cols = [name + self.DEFAULT_ETYPE] if is_dgl_data else dgl_g.etypes
+        adb_v_cols = [name + dgl_g.ntypes[0]] if is_dgl_data else dgl_g.ntypes
+        adb_e_cols = [name + dgl_g.etypes[0]] if is_dgl_data else dgl_g.etypes
         e_definitions = self.etypes_to_edefinitions(
             [
                 (
@@ -142,6 +142,9 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             else dgl_g.canonical_etypes
         )
 
+        has_one_ntype = len(dgl_g.ntypes) == 1
+        has_one_etype = len(dgl_g.etypes) == 1
+
         adb_documents = defaultdict(list)
         for v_col in adb_v_cols:
             v_col_docs = adb_documents[v_col]
@@ -151,8 +154,17 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
             node: Tensor
             for node in dgl_g.nodes(None if is_dgl_data else v_col):
-                id: int = node.item()
-                v_col_docs.append({"_key": str(id)})  # TODO: Import Node Features
+                dgl_node_id: int = node.item()
+                vertex = {"_key": str(dgl_node_id)}
+                self.__prepare_adb_attributes(
+                    dgl_g.ndata,
+                    dgl_g.node_attr_schemes(None if is_dgl_data else v_col).keys(),
+                    dgl_node_id,
+                    vertex,
+                    v_col,
+                    has_one_ntype,
+                )
+                v_col_docs.append(vertex)  # TODO: Import Node Features
 
                 if len(v_col_docs) >= batch_size:
                     self.__db.collection(v_col).import_bulk(
@@ -160,28 +172,39 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     )
                     v_col_docs.clear()
 
+        from_col: str
+        to_col: str
+        from_nodes: Tensor
+        to_nodes: Tensor
         for e_col in adb_e_cols:
             e_col_docs = adb_documents[e_col]
 
             if self.__db.has_collection(e_col) is False:
                 self.__db.create_collection(e_col, edge=True)
 
-            from_nodes: Tensor
-            to_nodes: Tensor
-            from_nodes, to_nodes = dgl_g.edges(etype=None if is_dgl_data else e_col)
-
             if is_dgl_data:
                 from_col = to_col = adb_v_cols[0]
             else:
                 from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
 
-            for from_node, to_node in zip(from_nodes, to_nodes):
-                e_col_docs.append(
-                    {
-                        "_from": f"{from_col}/{str(from_node.item())}",
-                        "_to": f"{to_col}/{str(to_node.item())}",  # TODO: Import Edge Features
-                    }
+            from_nodes, to_nodes = dgl_g.edges(etype=None if is_dgl_data else e_col)
+            for dgl_edge_id, (from_node, to_node) in enumerate(
+                zip(from_nodes, to_nodes)
+            ):
+                edge = {
+                    "_key": str(dgl_edge_id),
+                    "_from": f"{from_col}/{str(from_node.item())}",
+                    "_to": f"{to_col}/{str(to_node.item())}",  # TODO: Import Edge Features
+                }
+                self.__prepare_adb_attributes(
+                    dgl_g.edata,
+                    dgl_g.edge_attr_schemes(None if is_dgl_data else e_col).keys(),
+                    dgl_edge_id,
+                    edge,
+                    e_col,
+                    has_one_etype,
                 )
+                e_col_docs.append(edge)
 
                 if len(e_col_docs) >= batch_size:
                     self.__db.collection(e_col).import_bulk(
@@ -211,15 +234,6 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         return edge_definitions
 
-    def __insert_dgl_features(
-        self,
-        features: defaultdict,
-        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
-    ):
-        for key, col_dict in features.items():
-            for col, array in col_dict.items():
-                data[key] = {**data[key], col: torch.tensor(array)}
-
     def __prepare_dgl_features(
         self,
         features: defaultdict,
@@ -232,6 +246,30 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                 raise KeyError(f"{a} not in {doc['_id']}")
             array: list = features[a][col]
             array.append(self.__cntrl.adb_attribute_to_dgl_feature(col, a, doc[a]))
+
+    def __insert_dgl_features(
+        self,
+        features: defaultdict,
+        data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+    ):
+        for key, col_dict in features.items():
+            for col, array in col_dict.items():
+                data[key] = {**data[key], col: torch.tensor(array)}
+
+    def __prepare_adb_attributes(
+        self,
+        data: HeteroNodeDataView,
+        feature_keys: dict,
+        id: int,
+        doc: dict,
+        col: str,
+        has_one_type: bool,
+    ):
+        for key in feature_keys:
+            tensor = data[key] if has_one_type else data[key][col]
+            doc[key] = self.__cntrl.dgl_feature_to_adb_attribute(
+                col, key, tensor[id].item()
+            )
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.
