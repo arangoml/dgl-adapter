@@ -29,6 +29,8 @@ def pytest_sessionstart():
     print_connection_details(conn)
     time.sleep(5)  # Enough for the oasis instance to be ready.
 
+    arango_restore("adbdgl_adapter/tests/data/fraud_dump")
+
     global adbdgl_adapter
     adbdgl_adapter = ArangoDB_DGL_Adapter(conn)
 
