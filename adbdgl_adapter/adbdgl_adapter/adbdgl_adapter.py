@@ -347,7 +347,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         key: str
         for key in attributes:
             arr: list = features_data[key][col]
-            arr.append(self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc[key]))
+            arr.append(self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc.get(key, -1)))
 
     def __insert_dgl_features(
         self,
