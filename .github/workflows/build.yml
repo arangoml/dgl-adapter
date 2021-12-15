@@ -1,5 +1,6 @@
 name: build
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "adbdgl_adapter/adbdgl_adapter/**"
