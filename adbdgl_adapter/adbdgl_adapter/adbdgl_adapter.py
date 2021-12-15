@@ -237,13 +237,8 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     v_col,
                     has_one_ntype,
                 )
-                v_col_docs.append(vertex)
 
-                if len(v_col_docs) >= batch_size:
-                    self.__db.collection(v_col).import_bulk(
-                        v_col_docs, on_duplicate="replace"
-                    )
-                    v_col_docs.clear()
+                self.__insert_adb_docs(v_col, v_col_docs, vertex, batch_size)
 
         from_col: str
         to_col: str
@@ -277,13 +272,8 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     e_col,
                     has_one_etype,
                 )
-                e_col_docs.append(edge)
 
-                if len(e_col_docs) >= batch_size:
-                    self.__db.collection(e_col).import_bulk(
-                        e_col_docs, on_duplicate="replace"
-                    )
-                    e_col_docs.clear()
+                self.__insert_adb_docs(e_col, e_col_docs, edge, batch_size)
 
         self.__db.delete_graph(name, ignore_missing=True)
         adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
@@ -347,7 +337,9 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         key: str
         for key in attributes:
             arr: list = features_data[key][col]
-            arr.append(self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc.get(key, -1)))
+            arr.append(
+                self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc.get(key, -1))
+            )
 
     def __insert_dgl_features(
         self,
@@ -400,6 +392,24 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         for key in features:
             tensor = data[key] if has_one_type else data[key][col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
+
+    def __insert_adb_docs(self, col: str, col_docs: list, doc: dict, batch_size: int):
+        """Insert an ArangoDB document into a list. If the list exceeds batch_size documents, insert into the ArangoDB collection.
+
+        :param col: The collection name
+        :type col: str
+        :param col_docs: The existing documents data belonging to the collection.
+        :type col_docs: list
+        :param doc: The current document to insert.
+        :type doc: dict
+        :param batch_size: The maximum number of documents to insert at once
+        :type batch_size: int
+        """
+        col_docs.append(doc)
+
+        if len(col_docs) >= batch_size:
+            self.__db.collection(col).import_bulk(col_docs, on_duplicate="replace")
+            col_docs.clear()
 
     def __fetch_adb_docs(self, col: str, attributes: set, query_options: dict):
         """Fetches ArangoDB documents within a collection.
