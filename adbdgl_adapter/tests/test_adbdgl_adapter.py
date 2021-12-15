@@ -68,18 +68,6 @@ def test_validate_controller_class():
                 },
             },
         ),
-        # (
-        #     adbdgl_adapter,
-        #     "temp",
-        #     {
-        #         "vertexCollections": {
-        #             "temp": {"data"},
-        #         },
-        #         "edgeCollections": {
-        #             "tempEdge": {"data"},
-        #         },
-        #     },
-        # ),
     ],
 )
 def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, metagraph: dict):
