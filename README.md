@@ -12,9 +12,9 @@
 [![Code style: black](https://img.shields.io/static/v1?style=for-the-badge&label=code%20style&message=black&color=black)](https://github.com/psf/black)
 [![Downloads](https://img.shields.io/badge/dynamic/json?style=for-the-badge&color=282661&label=Downloads&query=total_downloads&url=https://api.pepy.tech/api/projects/adbdgl-adapter)](https://pepy.tech/project/adbdgl-adapter)
 
-![](https://raw.githubusercontent.com/arangoml/dgl-adapter/examples/assets/logos/adb_logo.png)
+![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/adb_logo.png)
 
-![](https://raw.githubusercontent.com/arangoml/dgl-adapter/examples/assets/logos/dgl_logo.png)
+![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/dgl_logo.png)
 
 The ArangoDB-DGL Adapter exports Graphs from ArangoDB, a multi-model Graph Database, into Deep Graph Library (DGL), a python package for graph neural networks, and vice-versa.
 
