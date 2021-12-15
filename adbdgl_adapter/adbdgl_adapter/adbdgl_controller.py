@@ -30,12 +30,6 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         except:
             return 0
 
-        # if atrib == "Sex":
-        #     return 0 if val == "M" else 1
-
-        # if atrib == "Ssn":
-        #     return int(str(val).replace("-", ""))
-
     def _dgl_feature_to_adb_attribute(self, key: str, col: str, val: Tensor):
         """
         Given a DGL feature key, its assigned value (for an arbitrary node or edge),

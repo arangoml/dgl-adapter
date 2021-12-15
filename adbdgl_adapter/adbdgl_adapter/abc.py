@@ -35,6 +35,9 @@ class ADBDGL_Adapter(ABC):
     def __prepare_adb_attributes(self):
         raise NotImplementedError()  # pragma: no cover
 
+    def __insert_adb_docs(self):
+        raise NotImplemented()  # pragma: no cover
+
     def __fetch_adb_docs(self):
         raise NotImplementedError()  # pragma: no cover
 
