@@ -23,7 +23,9 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
         and the collection it belongs to, convert it to a valid
         DGL feature: https://docs.dgl.ai/en/0.6.x/guide/graph-feature.html.
 
-        NOTE: DGL only accepts 'attributes' (a.k.a features) of numerical types.
+        NOTE: You must override this function if you want to transfer non-numerical ArangoDB
+        attributes to DGL (DGL only accepts 'attributes' (a.k.a features) of numerical types).
+        Read more about DGL features here: https://docs.dgl.ai/en/0.6.x/new-tutorial/2_dglgraph.html#assigning-node-and-edge-features-to-graph.
         """
         try:
             return float(val)
@@ -37,10 +39,8 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
 
         NOTE: No action is needed here if you want to keep the numerical-based values of your DGL features.
         """
-        if not val or type(val) is not Tensor:
-            return 0
-
         try:
             return val.item()
         except ValueError:
+            print("HERERERERE")
             return val.tolist()

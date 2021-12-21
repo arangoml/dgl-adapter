@@ -122,7 +122,7 @@ def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, is_dgl_data, batch_size",
+    "adapter, name, dgl_g, is_default_type, batch_size",
     [
         (adbdgl_adapter, "Clique", get_clique_graph(), True, 3),
         (adbdgl_adapter, "Lollipop", get_lollipop_graph(), True, 1000),
@@ -134,12 +134,12 @@ def test_dgl_to_adb(
     adapter: ArangoDB_DGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
-    is_dgl_data: bool,
+    is_default_type: bool,
     batch_size: int,
 ):
     assert_adapter_type(adapter)
     adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
-    assert_arangodb_data(name, dgl_g, adb_g, is_dgl_data)
+    assert_arangodb_data(name, dgl_g, adb_g, is_default_type)
 
 
 def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
@@ -180,11 +180,13 @@ def assert_arangodb_data(
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
-    is_dgl_data: bool,
+    is_default_type: bool,
 ):
     for dgl_v_col in dgl_g.ntypes:
-        adb_v_col = name + dgl_v_col if is_dgl_data else dgl_v_col
-        attributes = dgl_g.node_attr_schemes(None if is_dgl_data else dgl_v_col).keys()
+        adb_v_col = name + dgl_v_col if is_default_type else dgl_v_col
+        attributes = dgl_g.node_attr_schemes(
+            None if is_default_type else dgl_v_col
+        ).keys()
         col = adb_g.vertex_collection(adb_v_col)
 
         node: Tensor
@@ -196,11 +198,13 @@ def assert_arangodb_data(
 
     for dgl_e_col in dgl_g.etypes:
         dgl_from_col, _, dgl_to_col = dgl_g.to_canonical_etype(dgl_e_col)
-        attributes = dgl_g.edge_attr_schemes(None if is_dgl_data else dgl_e_col).keys()
+        attributes = dgl_g.edge_attr_schemes(
+            None if is_default_type else dgl_e_col
+        ).keys()
 
-        adb_e_col = name + dgl_e_col if is_dgl_data else dgl_e_col
-        adb_from_col = name + dgl_v_col if is_dgl_data else dgl_from_col
-        adb_to_col = name + dgl_v_col if is_dgl_data else dgl_to_col
+        adb_e_col = name + dgl_e_col if is_default_type else dgl_e_col
+        adb_from_col = name + dgl_v_col if is_default_type else dgl_from_col
+        adb_to_col = name + dgl_v_col if is_default_type else dgl_to_col
 
         col = adb_g.edge_collection(adb_e_col)
 

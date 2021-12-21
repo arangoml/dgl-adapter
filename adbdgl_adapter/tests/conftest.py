@@ -96,7 +96,9 @@ def get_karate_graph():
 
 def get_lollipop_graph():
     dgl_g = remove_self_loop(MiniGCDataset(8, 7, 8)[3][0])
-    dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
+    dgl_g.ndata["random_ndata"] = torch.tensor(
+        [[i, i, i] for i in range(0, dgl_g.num_nodes())]
+    )
     dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
     return dgl_g
 
@@ -104,12 +106,14 @@ def get_lollipop_graph():
 def get_hypercube_graph():
     dgl_g = remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
     dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
-    dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
+    dgl_g.edata["random_edata"] = torch.tensor(
+        [[[i], [i], [i]] for i in range(0, dgl_g.num_edges())]
+    )
     return dgl_g
 
 
 def get_clique_graph():
     dgl_g = remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])
-    dgl_g.ndata["random_ndata"] = torch.rand(dgl_g.num_nodes())
-    dgl_g.edata["random_edata"] = torch.rand(dgl_g.num_edges())
+    dgl_g.ndata["random_ndata"] = torch.ones(dgl_g.num_nodes())
+    dgl_g.edata["random_edata"] = torch.zeros(dgl_g.num_edges())
     return dgl_g

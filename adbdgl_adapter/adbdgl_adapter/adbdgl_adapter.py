@@ -200,9 +200,9 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
-        is_dgl_data = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
-        adb_v_cols = [name + dgl_g.ntypes[0]] if is_dgl_data else dgl_g.ntypes
-        adb_e_cols = [name + dgl_g.etypes[0]] if is_dgl_data else dgl_g.etypes
+        is_default_type = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
+        adb_v_cols = [name + dgl_g.ntypes[0]] if is_default_type else dgl_g.ntypes
+        adb_e_cols = [name + dgl_g.etypes[0]] if is_default_type else dgl_g.etypes
         e_definitions = self.etypes_to_edefinitions(
             [
                 (
@@ -211,7 +211,7 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
                     adb_v_cols[0],
                 )
             ]
-            if is_dgl_data
+            if is_default_type
             else dgl_g.canonical_etypes
         )
 
@@ -220,60 +220,62 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
 
         adb_documents = defaultdict(list)
         for v_col in adb_v_cols:
+            ntype = None if is_default_type else v_col
             v_col_docs = adb_documents[v_col]
 
             if self.__db.has_collection(v_col) is False:
                 self.__db.create_collection(v_col)
 
             node: Tensor
-            for node in dgl_g.nodes(None if is_dgl_data else v_col):
+            for node in dgl_g.nodes(ntype):
                 dgl_node_id: int = node.item()
-                vertex = {"_key": str(dgl_node_id)}
+                adb_vertex = {"_key": str(dgl_node_id)}
                 self.__prepare_adb_attributes(
                     dgl_g.ndata,
-                    dgl_g.node_attr_schemes(None if is_dgl_data else v_col).keys(),
+                    dgl_g.node_attr_schemes(ntype).keys(),
                     dgl_node_id,
-                    vertex,
+                    adb_vertex,
                     v_col,
                     has_one_ntype,
                 )
 
-                self.__insert_adb_docs(v_col, v_col_docs, vertex, batch_size)
+                self.__insert_adb_docs(v_col, v_col_docs, adb_vertex, batch_size)
 
         from_col: str
         to_col: str
         from_nodes: Tensor
         to_nodes: Tensor
         for e_col in adb_e_cols:
+            etype = None if is_default_type else e_col
             e_col_docs = adb_documents[e_col]
 
             if self.__db.has_collection(e_col) is False:
                 self.__db.create_collection(e_col, edge=True)
 
-            if is_dgl_data:
+            if is_default_type:
                 from_col = to_col = adb_v_cols[0]
             else:
                 from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
 
-            from_nodes, to_nodes = dgl_g.edges(etype=None if is_dgl_data else e_col)
+            from_nodes, to_nodes = dgl_g.edges(etype=etype)
             for dgl_edge_id, (from_node, to_node) in enumerate(
                 zip(from_nodes, to_nodes)
             ):
-                edge = {
+                adb_edge = {
                     "_key": str(dgl_edge_id),
                     "_from": f"{from_col}/{str(from_node.item())}",
                     "_to": f"{to_col}/{str(to_node.item())}",
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
-                    dgl_g.edge_attr_schemes(None if is_dgl_data else e_col).keys(),
+                    dgl_g.edge_attr_schemes(etype).keys(),
                     dgl_edge_id,
-                    edge,
+                    adb_edge,
                     e_col,
                     has_one_etype,
                 )
 
-                self.__insert_adb_docs(e_col, e_col_docs, edge, batch_size)
+                self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
 
         self.__db.delete_graph(name, ignore_missing=True)
         adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
@@ -427,7 +429,8 @@ class ArangoDB_DGL_Adapter(ADBDGL_Adapter):
             FOR doc IN {col}
                 RETURN MERGE(
                     KEEP(doc, {list(attributes)}), 
-                    {{"_id": doc._id, "_from": doc._from, "_to": doc._to}}
+                    {{"_id": doc._id}}, 
+                    doc._from ? {{"_from": doc._from, "_to": doc._to}}: {{}}
                 )
         """
 
