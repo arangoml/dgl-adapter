@@ -15,6 +15,9 @@ class Base_ADBDGL_Controller(ADBDGL_Controller):
 
     Responsible for controlling how ArangoDB attributes
     are converted into DGL features, and vice-versa.
+
+    You can derive your own custom ADBDGL_Controller if you want to maintain
+    consistency between your ArangoDB attributes & your DGL features.
     """
 
     def _adb_attribute_to_dgl_feature(self, key: str, col: str, val):
