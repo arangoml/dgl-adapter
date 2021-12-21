@@ -13,17 +13,19 @@
 [![Downloads](https://img.shields.io/badge/dynamic/json?style=for-the-badge&color=282661&label=Downloads&query=total_downloads&url=https://api.pepy.tech/api/projects/adbdgl-adapter)](https://pepy.tech/project/adbdgl-adapter)
 
 
-![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/adb_logo.png)
-<img src="https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/dgl_logo.png" width=40% />
+<a href="https://www.arangodb.com/" rel="arangodb.com">![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/adb_logo.png)</a>
+<a href="https://www.dgl.ai/" rel="dgl.ai"><img src="https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/dgl_logo.png" width=40% /></a>
 
 The ArangoDB-DGL Adapter exports Graphs from ArangoDB, a multi-model Graph Database, into Deep Graph Library (DGL), a python package for graph neural networks, and vice-versa.
 
 
 ## About DGL
 
-Website: https://www.dgl.ai/
+The Deep Graph Library (DGL) is an easy-to-use, high performance and scalable Python package for deep learning on graphs. DGL is framework agnostic, meaning if a deep graph model is a component of an end-to-end application, the rest of the logics can be implemented in any major frameworks, such as PyTorch, Apache MXNet or TensorFlow.
 
-Documentation: https://docs.dgl.ai/
+* [Website](https://www.dgl.ai/)
+* [Documentation](https://docs.dgl.ai/)
+* [Highlighted Features](https://github.com/dmlc/dgl#highlighted-features)
 
 ##  Quickstart
 
@@ -31,9 +33,14 @@ Get Started on Colab: <a href="https://colab.research.google.com/github/arangoml
 
 
 ```py
-from dgl.data import KarateClubDataset
+# Import the ArangoDB-DGL Adapter
 from adbdgl_adapter.adbdgl_adapter import ArangoDB_DGL_Adapter
 
+# Import a sample graph from DGL
+from dgl.data import KarateClubDataset
+
+# This is the connection information for your ArangoDB instance
+# (Let's assume that the ArangoDB fraud-detection data dump is imported to this endpoint)
 con = {
     "hostname": "localhost",
     "protocol": "http",
@@ -43,19 +50,35 @@ con = {
     "dbName": "_system",
 }
 
+# This instantiates your ADBDGL Adapter with your connection credentials
 adbdgl_adapter = ArangoDB_DGL_Adapter(con)
 
-# (Assume ArangoDB fraud-detection data dump is imported)
-fraud_dgl_g = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
-fraud_dgl_g_2 = adbdgl_adapter.arangodb_collections_to_dgl(
+# ArangoDB to DGL via Graph
+dgl_fraud_graph = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
+
+# ArangoDB to DGL via Collections
+dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
         "fraud-detection", 
-        {"account", "Class", "customer"},
-        {"accountHolder", "Relationship", "transaction"},
+        {"account", "Class", "customer"}, # Specify vertex collections
+        {"accountHolder", "Relationship", "transaction"}, # Specify edge collections
 )
 
+# ArangoDB to DGL via Metagraph
+metagraph = {
+    "vertexCollections": {
+        "account": {"Balance", "account_type", "customer_id", "rank"},
+        "customer": {"Name", "rank"},
+    },
+    "edgeCollections": {
+        "transaction": {"transaction_amt", "sender_bank_id", "receiver_bank_id"},
+        "accountHolder": {},
+    },
+}
+dgl_fraud_graph_3 = adbdgl_adapter.arangodb_to_dgl("fraud-detection", metagraph)
 
-karate_dgl_g = KarateClubDataset()[0]
-karate_adb_g = adbdgl_adapter.dgl_to_arangodb("Karate", karate_dgl_g)
+# DGL to ArangoDB
+dgl_karate_graph = KarateClubDataset()[0]
+adb_karate_graph = adbdgl_adapter.dgl_to_arangodb("Karate", karate_dgl_g)
 ```
 
 ##  Development & Testing
@@ -69,4 +92,3 @@ Prerequisite: `arangorestore` must be installed
 5. `cd adbdgl_adapter`
 6. `pip install -e . pytest`
 7. `pytest`
-    * If you encounter `ModuleNotFoundError`, try closing & relaunching your virtual environment by running `deactivate` in your terminal & restarting from Step 4.
