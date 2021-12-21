@@ -44,7 +44,7 @@ def pytest_sessionstart():
     client = ArangoClient(hosts=url)
     db = client.db(conn["dbName"], conn["username"], conn["password"], verify=True)
 
-    arango_restore("adbdgl_adapter/tests/data/fraud_dump")
+    arango_restore("examples/data/fraud_dump")
     db.create_graph(
         "fraud-detection",
         edge_definitions=[
