@@ -2,8 +2,14 @@ from typing import Set, Union
 
 import pytest
 from arango.graph import Graph as ArangoGraph
+from dgl import DGLGraph
+from dgl.heterograph import DGLHeteroGraph
+from torch.functional import Tensor
+
+from adbdgl_adapter.adapter import ADBDGL_Adapter
+from adbdgl_adapter.typings import ArangoMetagraph
+
 from .conftest import (
-    ADBDGL_Adapter,
     adbdgl_adapter,
     con,
     db,
@@ -12,11 +18,6 @@ from .conftest import (
     get_karate_graph,
     get_lollipop_graph,
 )
-from dgl import DGLGraph
-from dgl.heterograph import DGLHeteroGraph
-from torch.functional import Tensor
-
-from adbdgl_adapter.typings import ArangoMetagraph
 
 
 @pytest.mark.unit
@@ -40,7 +41,7 @@ def test_validate_controller_class() -> None:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(con, Bad_ADBDGL_Controller())
+        ADBDGL_Adapter(con, Bad_ADBDGL_Controller())  # type: ignore
 
 
 @pytest.mark.unit
