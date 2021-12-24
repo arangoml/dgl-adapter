@@ -1,27 +1,26 @@
-from typing import Union
+from typing import Set, Union
 
 import pytest
-from conftest import (
-    ArangoDB_DGL_Adapter,
+from arango.graph import Graph as ArangoGraph
+from .conftest import (
+    ADBDGL_Adapter,
+    adbdgl_adapter,
+    con,
+    db,
+    get_clique_graph,
+    get_hypercube_graph,
     get_karate_graph,
     get_lollipop_graph,
-    get_hypercube_graph,
-    get_clique_graph,
-    db,
-    conn,
-    adbdgl_adapter,
 )
-
 from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
-from arango.graph import Graph as ArangoGraph
-
-import torch
 from torch.functional import Tensor
+
+from adbdgl_adapter.typings import ArangoMetagraph
 
 
 @pytest.mark.unit
-def test_validate_attributes():
+def test_validate_attributes() -> None:
     bad_connection = {
         "dbName": "_system",
         "hostname": "localhost",
@@ -32,16 +31,16 @@ def test_validate_attributes():
     }
 
     with pytest.raises(ValueError):
-        ArangoDB_DGL_Adapter(bad_connection)
+        ADBDGL_Adapter(bad_connection)
 
 
 @pytest.mark.unit
-def test_validate_controller_class():
+def test_validate_controller_class() -> None:
     class Bad_ADBDGL_Controller:
         pass
 
     with pytest.raises(TypeError):
-        ArangoDB_DGL_Adapter(conn, Bad_ADBDGL_Controller)
+        ADBDGL_Adapter(con, Bad_ADBDGL_Controller())
 
 
 @pytest.mark.unit
@@ -70,10 +69,11 @@ def test_validate_controller_class():
         ),
     ],
 )
-def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, metagraph: dict):
-    assert_adapter_type(adapter)
+def test_adb_to_dgl(
+    adapter: ADBDGL_Adapter, name: str, metagraph: ArangoMetagraph
+) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
-    assert_dgl_data(dgl_g, metagraph["vertexCollections"], metagraph["edgeCollections"])
+    assert_dgl_data(dgl_g, metagraph)
 
 
 @pytest.mark.unit
@@ -89,16 +89,19 @@ def test_adb_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str, metagraph: dict):
     ],
 )
 def test_adb_collections_to_dgl(
-    adapter: ArangoDB_DGL_Adapter, name: str, v_cols: set, e_cols: set
-):
-    assert_adapter_type(adapter)
+    adapter: ADBDGL_Adapter, name: str, v_cols: Set[str], e_cols: Set[str]
+) -> None:
     dgl_g = adapter.arangodb_collections_to_dgl(
         name,
         v_cols,
         e_cols,
     )
     assert_dgl_data(
-        dgl_g, {v_col: {} for v_col in v_cols}, {e_col: {} for e_col in e_cols}
+        dgl_g,
+        metagraph={
+            "vertexCollections": {col: set() for col in v_cols},
+            "edgeCollections": {col: set() for col in e_cols},
+        },
     )
 
 
@@ -107,16 +110,18 @@ def test_adb_collections_to_dgl(
     "adapter, name",
     [(adbdgl_adapter, "fraud-detection")],
 )
-def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str):
-    assert_adapter_type(adapter)
-
+def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
     arango_graph = db.graph(name)
     v_cols = arango_graph.vertex_collections()
     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
 
     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
     assert_dgl_data(
-        dgl_g, {v_col: {} for v_col in v_cols}, {e_col: {} for e_col in e_cols}
+        dgl_g,
+        metagraph={
+            "vertexCollections": {col: set() for col in v_cols},
+            "edgeCollections": {col: set() for col in e_cols},
+        },
     )
 
 
@@ -131,26 +136,21 @@ def test_adb_graph_to_dgl(adapter: ArangoDB_DGL_Adapter, name: str):
     ],
 )
 def test_dgl_to_adb(
-    adapter: ArangoDB_DGL_Adapter,
+    adapter: ADBDGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     is_default_type: bool,
     batch_size: int,
-):
-    assert_adapter_type(adapter)
+) -> None:
     adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
     assert_arangodb_data(name, dgl_g, adb_g, is_default_type)
 
 
-def assert_adapter_type(adapter: ArangoDB_DGL_Adapter):
-    assert type(adapter) is ArangoDB_DGL_Adapter
+def assert_dgl_data(dgl_g: DGLGraph, metagraph: ArangoMetagraph) -> None:
+    has_one_ntype = len(metagraph["vertexCollections"]) == 1
+    has_one_etype = len(metagraph["edgeCollections"]) == 1
 
-
-def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
-    has_one_ntype = len(v_cols) == 1
-    has_one_etype = len(e_cols) == 1
-
-    for col, atribs in v_cols.items():
+    for col, atribs in metagraph["vertexCollections"].items():
         num_nodes = dgl_g.num_nodes(col)
         assert num_nodes == db.collection(col).count()
 
@@ -162,7 +162,7 @@ def assert_dgl_data(dgl_g: DGLGraph, v_cols: dict, e_cols: dict):
                 assert col in dgl_g.ndata[atrib]
                 assert len(dgl_g.ndata[atrib][col]) == num_nodes
 
-    for col, atribs in e_cols.items():
+    for col, atribs in metagraph["edgeCollections"].items():
         num_edges = dgl_g.num_edges(col)
         assert num_edges == db.collection(col).count()
 
@@ -181,7 +181,7 @@ def assert_arangodb_data(
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
     is_default_type: bool,
-):
+) -> None:
     for dgl_v_col in dgl_g.ntypes:
         adb_v_col = name + dgl_v_col if is_default_type else dgl_v_col
         attributes = dgl_g.node_attr_schemes(

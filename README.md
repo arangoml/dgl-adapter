@@ -29,12 +29,12 @@ The Deep Graph Library (DGL) is an easy-to-use, high performance and scalable Py
 
 ##  Quickstart
 
-Get Started on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Get Started on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ADBDGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 
 ```py
 # Import the ArangoDB-DGL Adapter
-from adbdgl_adapter.adbdgl_adapter import ArangoDB_DGL_Adapter
+from adbdgl_adapter.adbdgl_adapter import ADBDGL_Adapter
 
 # Import a sample graph from DGL
 from dgl.data import KarateClubDataset
@@ -51,7 +51,7 @@ con = {
 }
 
 # This instantiates your ADBDGL Adapter with your connection credentials
-adbdgl_adapter = ArangoDB_DGL_Adapter(con)
+adbdgl_adapter = ADBDGL_Adapter(con)
 
 # ArangoDB to DGL via Graph
 dgl_fraud_graph = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
