@@ -34,7 +34,7 @@ Get Started on Colab: <a href="https://colab.research.google.com/github/arangoml
 
 ```py
 # Import the ArangoDB-DGL Adapter
-from adbdgl_adapter.adbdgl_adapter import ADBDGL_Adapter
+from adbdgl_adapter.adapter import ADBDGL_Adapter
 
 # Import a sample graph from DGL
 from dgl.data import KarateClubDataset
@@ -89,6 +89,5 @@ Prerequisite: `arangorestore` must be installed
 2. `cd dgl-adapter`
 3. `python -m venv .venv`
 4. `source .venv/bin/activate` (MacOS) or `.venv/scripts/activate` (Windows)
-5. `cd adbdgl_adapter`
-6. `pip install -e . pytest`
-7. `pytest`
+5. `pip install -e . pytest`
+6. `pytest`
