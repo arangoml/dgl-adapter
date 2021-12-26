@@ -20,7 +20,6 @@ from .conftest import (
 )
 
 
-@pytest.mark.unit
 def test_validate_attributes() -> None:
     bad_connection = {
         "dbName": "_system",
@@ -35,7 +34,6 @@ def test_validate_attributes() -> None:
         ADBDGL_Adapter(bad_connection)
 
 
-@pytest.mark.unit
 def test_validate_controller_class() -> None:
     class Bad_ADBDGL_Controller:
         pass
@@ -44,7 +42,6 @@ def test_validate_controller_class() -> None:
         ADBDGL_Adapter(con, Bad_ADBDGL_Controller())  # type: ignore
 
 
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "adapter, name, metagraph",
     [
@@ -77,7 +74,6 @@ def test_adb_to_dgl(
     assert_dgl_data(dgl_g, metagraph)
 
 
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "adapter, name, v_cols, e_cols",
     [
@@ -106,7 +102,6 @@ def test_adb_collections_to_dgl(
     )
 
 
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "adapter, name",
     [(adbdgl_adapter, "fraud-detection")],
@@ -126,7 +121,6 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
     )
 
 
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "adapter, name, dgl_g, is_default_type, batch_size",
     [
