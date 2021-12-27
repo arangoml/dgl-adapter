@@ -1,18 +1,18 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 with open("./README.md") as fp:
     long_description = fp.read()
 
 setup(
     name="adbdgl_adapter",
-    author="ArangoDB",
-    author_email="hackers@arangodb.com",
+    author="Anthony Mahanna",
+    author_email="anthony.mahanna@arangodb.com",
     description="Convert ArangoDB graphs to DGL & vice-versa.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/arangoml/dgl-adapter",
     keywords=["arangodb", "dgl", "adapter"],
-    packages=find_packages(exclude=["tests"]),
+    packages=["adbdgl_adapter"],
     include_package_data=True,
     use_scm_version=True,
     setup_requires=["setuptools_scm"],
