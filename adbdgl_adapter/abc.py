@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-@author: Anthony Mahanna
-"""
 
 from abc import ABC
 from typing import Any, List, Set, Union

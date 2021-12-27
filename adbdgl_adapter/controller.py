@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 from typing import Any
 
 from torch.functional import Tensor
 
 from .abc import Abstract_ADBDGL_Controller
-
-"""
-
-@author: Anthony Mahanna
-"""
 
 
 class ADBDGL_Controller(Abstract_ADBDGL_Controller):
