@@ -38,6 +38,9 @@ class ADBDGL_Controller(Abstract_ADBDGL_Controller):
         :return: The attribute's representation as a DGL Feature
         :rtype: Any
         """
+        if type(val) in [int, float, bool]:
+            return val
+
         try:
             return float(val)
         except (ValueError, TypeError, SyntaxError):
