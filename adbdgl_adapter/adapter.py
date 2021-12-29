@@ -352,7 +352,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for key in attributes:
             arr: List[Any] = features_data[key][col]
             arr.append(
-                self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc.get(key, -1))
+                self.__cntrl._adb_attribute_to_dgl_feature(key, col, doc.get(key, None))
             )
 
     def __insert_dgl_features(
