@@ -28,6 +28,15 @@ class ADBDGL_Controller(Abstract_ADBDGL_Controller):
         ArangoDB attributes to DGL (DGL only accepts 'attributes' (a.k.a features)
         of numerical types). Read more about DGL features here:
         https://docs.dgl.ai/en/0.6.x/new-tutorial/2_dglgraph.html#assigning-node-and-edge-features-to-graph.
+
+        :param key: The ArangoDB attribute key name
+        :type key: str
+        :param col: The ArangoDB collection of the ArangoDB document.
+        :type col: str
+        :param val: The assigned attribute value of the ArangoDB document.
+        :type val: Any
+        :return: The attribute's representation as a DGL Feature
+        :rtype: Any
         """
         try:
             return float(val)
@@ -42,6 +51,15 @@ class ADBDGL_Controller(Abstract_ADBDGL_Controller):
 
         NOTE: No action is needed here if you want to keep the numerical-based values
         of your DGL features.
+
+        :param key: The DGL attribute key name
+        :type key: str
+        :param col: The ArangoDB collection of the (soon-to-be) ArangoDB document.
+        :type col: str
+        :param val: The assigned attribute value of the DGL node.
+        :type val: Tensor
+        :return: The feature's representation as an ArangoDB Attribute
+        :rtype: Any
         """
         try:
             return val.item()

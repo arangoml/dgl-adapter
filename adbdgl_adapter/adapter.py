@@ -23,23 +23,23 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     """ArangoDB-DGL adapter.
 
     :param conn: Connection details to an ArangoDB instance.
-    :type conn: dict[str, str | int]
-    :param controller_class: The ArangoDB-DGL controller, for controlling how
+    :type conn: adbdgl_adapter.typings.Json
+    :param controller: The ArangoDB-DGL controller, for controlling how
         ArangoDB attributes are converted into DGL features, and vice-versa.
         Optionally re-defined by the user if needed (otherwise defaults to
         ADBDGL_Controller).
-    :type controller_class: ADBDGL_Controller
+    :type controller: adbdgl_adapter.controller.ADBDGL_Controller
     :raise ValueError: If missing required keys in conn
     """
 
     def __init__(
         self,
         conn: Json,
-        controller_class: ADBDGL_Controller = ADBDGL_Controller(),
+        controller: ADBDGL_Controller = ADBDGL_Controller(),
     ):
         self.__validate_attributes("connection", set(conn), self.CONNECTION_ATRIBS)
-        if issubclass(type(controller_class), ADBDGL_Controller) is False:
-            msg = "controller_class must inherit from ADBDGL_Controller"
+        if issubclass(type(controller), ADBDGL_Controller) is False:
+            msg = "controller must inherit from ADBDGL_Controller"
             raise TypeError(msg)
 
         username: str = conn["username"]
@@ -53,7 +53,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         print(f"Connecting to {url}")
         self.__db = ArangoClient(hosts=url).db(db_name, username, password, verify=True)
-        self.__cntrl: ADBDGL_Controller = controller_class
+        self.__cntrl: ADBDGL_Controller = controller
 
     def arangodb_to_dgl(
         self, name: str, metagraph: ArangoMetagraph, **query_options: Any
@@ -64,10 +64,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type name: str
         :param metagraph: An object defining vertex & edge collections to import
             to DGL, along with their associated attributes to keep.
-        :type metagraph: dict
+        :type metagraph: adbdgl_adapter.typings.ArangoMetagraph
         :param query_options: Keyword arguments to specify AQL query options when
             fetching documents from the ArangoDB instance.
-        :type query_options: **kwargs
+        :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
         :raise ValueError: If missing required keys in metagraph
@@ -161,14 +161,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         :param name: The DGL graph name.
         :type name: str
-        :param vertex_collections: A set of ArangoDB vertex collections to
+        :param v_cols: A set of ArangoDB vertex collections to
             import to DGL.
-        :type vertex_collections: set
-        :param edge_collections: A set of ArangoDB edge collections to import to DGL.
-        :type edge_collections: set
+        :type v_cols: Set[str]
+        :param e_cols: A set of ArangoDB edge collections to import to DGL.
+        :type e_cols: Set[str]
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
-        :type query_options: **kwargs
+        :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
         """
@@ -186,7 +186,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type name: str
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
-        :type query_options: **kwargs
+        :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
         """
@@ -303,18 +303,18 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         :param canonical_etypes: A list of string triplets (str, str, str) for
             source node type, edge type and destination node type.
-        :type canonical_etypes: list[tuple]
+        :type canonical_etypes: List[adbdgl_adapter.typings.DGLCanonicalEType]
         :return: ArangoDB Edge Definitions
-        :rtype: list[dict[str, Union[str, list[str]]]]
+        :rtype: List[adbdgl_adapter.typings.Json]
 
         Here is an example of **edge_definitions**:
 
         .. code-block:: python
         [
             {
-                "edge_collection": "teach",
-                "from_vertex_collections": ["teachers"],
-                "to_vertex_collections": ["lectures"]
+                "edge_collection": "teaches",
+                "from_vertex_collections": ["Teacher"],
+                "to_vertex_collections": ["Lecture"]
             }
         ]
         """
@@ -340,14 +340,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """Convert a set of ArangoDB attributes into valid DGL features
 
         :param features_data: A dictionary storing the DGL features formatted as lists.
-        :type features_data: defaultdict[Any, defaultdict[Any, list]]
+        :type features_data: Defaultdict[Any, Any]
+        :param attributes: A set of ArangoDB attribute keys to convert into DGL features
+        :type attributes: Set[str]
+        :param doc: The current ArangoDB document
+        :type doc: adbdgl_adapter.typings.Json
         :param col: The collection the current document belongs to
         :type col: str
-        :param attributes: A set of ArangoDB attribute keys to convert into DGL features
-        :type attributes: set
-        :param doc: The current ArangoDB document
-        :type doc: dict
-
         """
         key: str
         for key in attributes:
@@ -365,10 +364,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """Insert valid DGL features into a DGL graph.
 
         :param features_data: A dictionary storing the DGL features formatted as lists.
-        :type features_data: defaultdict[Any, defaultdict[Any, list]]
+        :type features_data: Defaultdict[Any, Any]
         :param data: The (empty) ndata or edata instance attribute of a dgl graph,
-            which is about to receive the **features_data**.
-        :type data: Union[HeteroNodeDataView, HeteroEdgeDataView]
+            which is about to receive **features_data**.
+        :type data: Union[dgl.view.HeteroNodeDataView, dgl.view.HeteroEdgeDataView]
         :param has_one_type: Set to True if the DGL graph only has one ntype,
             or one etype.
         :type has_one_type: bool
@@ -393,13 +392,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         :param data: The ndata or edata instance attribute of a dgl graph, filled with
             node or edge feature data.
-        :type data: Union[HeteroNodeDataView, HeteroEdgeDataView]
+        :type data: Union[dgl.view.HeteroNodeDataView, dgl.view.HeteroEdgeDataView]
         :param features: A set of DGL feature keys to convert into ArangoDB attributes
-        :type features: set
+        :type features: Set[Any]
         :param id: The ID of the current DGL node / edge
-        :type id: int | float | bool
+        :type id: Union[int, float, bool]
         :param doc: The current ArangoDB document
-        :type doc: dict
+        :type doc: adbdgl_adapter.typings.Json
         :param col: The collection the current document belongs to
         :type col: str
         :param has_one_type: Set to True if the DGL graph only has one ntype,
@@ -423,9 +422,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param col: The collection name
         :type col: str
         :param col_docs: The existing documents data belonging to the collection.
-        :type col_docs: list
+        :type col_docs: List[adbdgl_adapter.typings.Json]
         :param doc: The current document to insert.
-        :type doc: dict
+        :type doc: adbdgl_adapter.typings.Json
         :param batch_size: The maximum number of documents to insert at once
         :type batch_size: int
         """
@@ -443,10 +442,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param col: The ArangoDB collection.
         :type col: str
         :param attributes: The set of document attributes.
-        :type attributes: set
+        :type attributes: Set[str]
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
-        :type query_options: **kwargs
+        :type query_options: Any
         :return: Result cursor.
         :rtype: arango.cursor.Cursor
         """
@@ -471,9 +470,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             (e.g connection attributes, graph attributes, etc).
         :type type: str
         :param attributes: The provided attributes, possibly invalid.
-        :type attributes: set
+        :type attributes: Set[str]
         :param valid_attributes: The valid attributes.
-        :type valid_attributes: set
+        :type valid_attributes: Set[str]
         :raise ValueError: If **valid_attributes** is not a subset of **attributes**
         """
         if valid_attributes.issubset(attributes) is False:
