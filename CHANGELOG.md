@@ -1,3 +1,12 @@
+## 1.0.1 (2021-12-30)
+
+### Fix
+
+* Replace auto merge with echo (#5) [Anthony Mahanna]
+
+* README colab link. [aMahanna]
+
+
 ## 1.0.0 (2021-12-30)
 
 ### New
