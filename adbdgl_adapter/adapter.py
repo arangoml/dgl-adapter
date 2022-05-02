@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Set, Union
 
 from arango import ArangoClient
+from arango.database import StandardDatabase
 from arango.cursor import Cursor
 from arango.graph import Graph as ArangoDBGraph
 from arango.result import Result
@@ -54,6 +55,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         print(f"Connecting to {url}")
         self.__db = ArangoClient(hosts=url).db(db_name, username, password, verify=True)
         self.__cntrl: ADBDGL_Controller = controller
+
+    def db(self) -> StandardDatabase:
+        return self.__db
 
     def arangodb_to_dgl(
         self, name: str, metagraph: ArangoMetagraph, **query_options: Any

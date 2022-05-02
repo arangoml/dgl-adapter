@@ -83,11 +83,22 @@ adb_karate_graph = adbdgl_adapter.dgl_to_arangodb("Karate", karate_dgl_g)
 
 ##  Development & Testing
 
-Prerequisite: `arangorestore` must be installed
+Prerequisite: `arangorestore`
 
 1. `git clone https://github.com/arangoml/dgl-adapter.git`
 2. `cd dgl-adapter`
-3. `python -m venv .venv`
-4. `source .venv/bin/activate` (MacOS) or `.venv/scripts/activate` (Windows)
+3. (create virtual environment of choice)
 5. `pip install -e . pytest`
-6. `pytest`
+6. `docker run -p 8529:8529 -e ARANGO_ROOT_PASSWORD=opensesame arangodb/arangodb:3.9.1` (optional if not already active)
+7. `pytest --host localhost --port 8529 --password opensesame`
+
+Note: You can run the set of tests on any ArangoDB endpoint via the following command-line options:
+```python
+def pytest_addoption(parser):
+    parser.addoption("--protocol", action="store", default="http")
+    parser.addoption("--host", action="store", default="localhost")
+    parser.addoption("--port", action="store", default="8529")
+    parser.addoption("--dbName", action="store", default="_system")
+    parser.addoption("--username", action="store", default="root")
+    parser.addoption("--password", action="store", default="opensesame")
+```
