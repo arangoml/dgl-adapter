@@ -1,6 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from dgl import DGLGraph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
@@ -9,10 +10,12 @@ from torch import ones, rand, tensor, zeros  # type: ignore
 from adbdgl_adapter.adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import Json
 
+con: Json
+adbdgl_adapter: ADBDGL_Adapter
 PROJECT_DIR = Path(__file__).parent.parent
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: Any) -> None:
     parser.addoption("--protocol", action="store", default="http")
     parser.addoption("--host", action="store", default="localhost")
     parser.addoption("--port", action="store", default="8529")
@@ -21,7 +24,7 @@ def pytest_addoption(parser):
     parser.addoption("--password", action="store", default="opensesame")
 
 
-def pytest_configure(config) -> None:
+def pytest_configure(config: Any) -> None:
     global con
     con = {
         "protocol": config.getoption("protocol"),
@@ -42,7 +45,7 @@ def pytest_configure(config) -> None:
     global adbdgl_adapter
     adbdgl_adapter = ADBDGL_Adapter(con)
 
-    ### Restore fraud dataset via arangorestore
+    # Restore fraud dataset via arangorestore
     arango_restore_data_path = "examples/data/fraud_dump"
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
     subprocess.check_call(
@@ -55,7 +58,7 @@ def pytest_configure(config) -> None:
         shell=True,
     )
 
-    ### Create Fraud Detection Graph
+    # Create Fraud Detection Graph
     adbdgl_adapter.db().delete_graph("fraud-detection", ignore_missing=True)
     adbdgl_adapter.db().create_graph(
         "fraud-detection",
