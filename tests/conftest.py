@@ -5,7 +5,6 @@ from typing import Any
 
 from dgl import DGLGraph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
-from requests import post
 from torch import ones, rand, tensor, zeros
 
 from adbdgl_adapter.adapter import ADBDGL_Adapter
