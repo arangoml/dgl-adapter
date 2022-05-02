@@ -5,8 +5,8 @@ from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Set, Union
 
 from arango import ArangoClient
-from arango.database import StandardDatabase
 from arango.cursor import Cursor
+from arango.database import StandardDatabase
 from arango.graph import Graph as ArangoDBGraph
 from arango.result import Result
 from dgl import DGLGraph, heterograph
