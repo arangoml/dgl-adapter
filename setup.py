@@ -20,7 +20,7 @@ setup(
     license="Apache Software License",
     install_requires=[
         "dgl==0.6.1",
-        "torch==1.11.0",
+        "torch==1.10.2",
         "python-arango==7.3.1",
         "setuptools>=42",
         "setuptools_scm[toml]>=3.4",
