@@ -21,7 +21,7 @@ setup(
     install_requires=[
         "dgl==0.6.1",
         "torch==1.11.0",
-        "python-arango==7.3.3",
+        "python-arango==7.3.1",
         "setuptools>=42",
         "setuptools_scm[toml]>=3.4",
     ],
