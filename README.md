@@ -98,7 +98,7 @@ Prerequisite: `arangorestore`
 5. (create an ArangoDB instance with method of choice)
 6. `pytest --protocol <> --host <> --port <> --dbName <> --username <> --password <>`
 
-**Note** Parameters can be omitted if the endpoint uses the default values specified below:
+**Note**: A `pytest` parameter can be omitted if the endpoint is using its default value:
 ```python
 def pytest_addoption(parser):
     parser.addoption("--protocol", action="store", default="http")
