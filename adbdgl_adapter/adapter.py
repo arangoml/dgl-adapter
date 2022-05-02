@@ -12,7 +12,7 @@ from arango.result import Result
 from dgl import DGLGraph, heterograph
 from dgl.heterograph import DGLHeteroGraph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
-from torch import tensor  # type: ignore
+from torch import tensor
 from torch.functional import Tensor
 
 from .abc import Abstract_ADBDGL_Adapter

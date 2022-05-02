@@ -49,8 +49,8 @@ jobs:
         run: flake8 ${{env.PACKAGE_DIR}} ${{env.TESTS_DIR}}
       - name: Run isort
         run: isort --check --profile=black ${{env.PACKAGE_DIR}} ${{env.TESTS_DIR}}
-      # - name: Run mypy
-      #   run: mypy ${{env.PACKAGE_DIR}} ${{env.TESTS_DIR}}
+      - name: Run mypy
+        run: mypy ${{env.PACKAGE_DIR}} ${{env.TESTS_DIR}}
       - name: Run pytest
         run: py.test --cov=${{env.PACKAGE_DIR}} --cov-report xml -v --color=yes --no-cov-on-fail --code-highlight=yes
       - name: Publish to coveralls.io
