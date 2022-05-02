@@ -21,7 +21,7 @@ def pytest_addoption(parser: Any) -> None:
     parser.addoption("--port", action="store", default="8529")
     parser.addoption("--dbName", action="store", default="_system")
     parser.addoption("--username", action="store", default="root")
-    parser.addoption("--password", action="store", default="opensesame")
+    parser.addoption("--password", action="store", default="openSesame")
 
 
 def pytest_configure(config: Any) -> None:
