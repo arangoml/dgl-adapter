@@ -48,11 +48,11 @@ from dgl.data import KarateClubDataset
 # Store ArangoDB endpoint connection info
 # Assumption: the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
 con = {
-    "hostname": "localhost",
     "protocol": "http",
+    "hostname": "localhost",
     "port": 8529,
     "username": "root",
-    "password": "rootpassword",
+    "password": "openSesame",
     "dbName": "_system",
 }
 
