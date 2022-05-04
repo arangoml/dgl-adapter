@@ -66,6 +66,7 @@ def pytest_configure(config: Any) -> None:
         ],
     )
 
+
 def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
 
@@ -78,6 +79,7 @@ def arango_restore(con: Json, path_to_data: str) -> None:
         cwd=f"{PROJECT_DIR}/tests",
         shell=True,
     )
+
 
 def get_karate_graph() -> DGLGraph:
     return KarateClubDataset()[0]
