@@ -46,17 +46,7 @@ def pytest_configure(config: Any) -> None:
     adbdgl_adapter = ADBDGL_Adapter(con)
 
     # Restore fraud dataset via arangorestore
-    arango_restore_data_path = "examples/data/fraud_dump"
-    restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
-    subprocess.check_call(
-        f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
-            -c none --server.endpoint tcp://{con["hostname"]}:{con["port"]} \
-                --server.username {con["username"]} --server.database {con["dbName"]} \
-                    --server.password {con["password"]} \
-                        --input-directory "{PROJECT_DIR}/{arango_restore_data_path}"',
-        cwd=f"{PROJECT_DIR}/tests",
-        shell=True,
-    )
+    arango_restore(con, "examples/data/fraud_dump")
 
     # Create Fraud Detection Graph
     adbdgl_adapter.db().delete_graph("fraud-detection", ignore_missing=True)
@@ -76,6 +66,18 @@ def pytest_configure(config: Any) -> None:
         ],
     )
 
+def arango_restore(con: Json, path_to_data: str) -> None:
+    restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
+
+    subprocess.check_call(
+        f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
+            -c none --server.endpoint tcp://{con["hostname"]}:{con["port"]} \
+                --server.username {con["username"]} --server.database {con["dbName"]} \
+                    --server.password {con["password"]} \
+                        --input-directory "{PROJECT_DIR}/{path_to_data}"',
+        cwd=f"{PROJECT_DIR}/tests",
+        shell=True,
+    )
 
 def get_karate_graph() -> DGLGraph:
     return KarateClubDataset()[0]
