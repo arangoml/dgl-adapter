@@ -27,9 +27,15 @@ The Deep Graph Library (DGL) is an easy-to-use, high performance and scalable Py
 * [Documentation](https://docs.dgl.ai/)
 * [Highlighted Features](https://github.com/dmlc/dgl#highlighted-features)
 
+## Installation
+
+```
+pip install adbdgl-adapter
+```
+
 ##  Quickstart
 
-Get Started on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+For a more detailed walk-through, access the official notebook on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 
 ```py
@@ -39,31 +45,31 @@ from adbdgl_adapter.adapter import ADBDGL_Adapter
 # Import a sample graph from DGL
 from dgl.data import KarateClubDataset
 
-# This is the connection information for your ArangoDB instance
-# (Let's assume that the ArangoDB fraud-detection data dump is imported to this endpoint)
+# Store ArangoDB endpoint connection info
+# Assumption: the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
 con = {
-    "hostname": "localhost",
     "protocol": "http",
+    "hostname": "localhost",
     "port": 8529,
     "username": "root",
-    "password": "rootpassword",
+    "password": "openSesame",
     "dbName": "_system",
 }
 
-# This instantiates your ADBDGL Adapter with your connection credentials
+# Instantiate the ADBDGL Adapter with connection credentials
 adbdgl_adapter = ADBDGL_Adapter(con)
 
-# ArangoDB to DGL via Graph
+# Convert ArangoDB to DGL via Graph Name
 dgl_fraud_graph = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
 
-# ArangoDB to DGL via Collections
+# Convert ArangoDB to DGL via Collection Names
 dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
         "fraud-detection", 
         {"account", "Class", "customer"}, # Specify vertex collections
         {"accountHolder", "Relationship", "transaction"}, # Specify edge collections
 )
 
-# ArangoDB to DGL via Metagraph
+# Convert ArangoDB to DGL via a Metagraph
 metagraph = {
     "vertexCollections": {
         "account": {"Balance", "account_type", "customer_id", "rank"},
@@ -76,18 +82,29 @@ metagraph = {
 }
 dgl_fraud_graph_3 = adbdgl_adapter.arangodb_to_dgl("fraud-detection", metagraph)
 
-# DGL to ArangoDB
+# Convert DGL to ArangoDB
 dgl_karate_graph = KarateClubDataset()[0]
-adb_karate_graph = adbdgl_adapter.dgl_to_arangodb("Karate", karate_dgl_g)
+adb_karate_graph = adbdgl_adapter.dgl_to_arangodb("Karate", dgl_karate_graph)
 ```
 
 ##  Development & Testing
 
-Prerequisite: `arangorestore` must be installed
+Prerequisite: `arangorestore`
 
 1. `git clone https://github.com/arangoml/dgl-adapter.git`
 2. `cd dgl-adapter`
-3. `python -m venv .venv`
-4. `source .venv/bin/activate` (MacOS) or `.venv/scripts/activate` (Windows)
-5. `pip install -e . pytest`
-6. `pytest`
+3. (create virtual environment of choice)
+4. `pip install -e . pytest`
+5. (create an ArangoDB instance with method of choice)
+6. `pytest --protocol <> --host <> --port <> --dbName <> --username <> --password <>`
+
+**Note**: A `pytest` parameter can be omitted if the endpoint is using its default value:
+```python
+def pytest_addoption(parser):
+    parser.addoption("--protocol", action="store", default="http")
+    parser.addoption("--host", action="store", default="localhost")
+    parser.addoption("--port", action="store", default="8529")
+    parser.addoption("--dbName", action="store", default="_system")
+    parser.addoption("--username", action="store", default="root")
+    parser.addoption("--password", action="store", default="openSesame")
+```

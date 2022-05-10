@@ -6,12 +6,13 @@ from typing import Any, DefaultDict, Dict, List, Set, Union
 
 from arango import ArangoClient
 from arango.cursor import Cursor
+from arango.database import StandardDatabase
 from arango.graph import Graph as ArangoDBGraph
 from arango.result import Result
 from dgl import DGLGraph, heterograph
 from dgl.heterograph import DGLHeteroGraph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
-from torch import tensor  # type: ignore
+from torch import tensor
 from torch.functional import Tensor
 
 from .abc import Abstract_ADBDGL_Adapter
@@ -54,6 +55,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         print(f"Connecting to {url}")
         self.__db = ArangoClient(hosts=url).db(db_name, username, password, verify=True)
         self.__cntrl: ADBDGL_Controller = controller
+
+    def db(self) -> StandardDatabase:
+        return self.__db
 
     def arangodb_to_dgl(
         self, name: str, metagraph: ArangoMetagraph, **query_options: Any

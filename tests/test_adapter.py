@@ -1,6 +1,7 @@
 from typing import Set, Union
 
 import pytest
+from arango.database import StandardDatabase
 from arango.graph import Graph as ArangoGraph
 from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
@@ -12,7 +13,6 @@ from adbdgl_adapter.typings import ArangoMetagraph
 from .conftest import (
     adbdgl_adapter,
     con,
-    db,
     get_clique_graph,
     get_hypercube_graph,
     get_karate_graph,
@@ -71,7 +71,7 @@ def test_adb_to_dgl(
     adapter: ADBDGL_Adapter, name: str, metagraph: ArangoMetagraph
 ) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
-    assert_dgl_data(dgl_g, metagraph)
+    assert_dgl_data(adapter.db(), dgl_g, metagraph)
 
 
 @pytest.mark.parametrize(
@@ -94,6 +94,7 @@ def test_adb_collections_to_dgl(
         e_cols,
     )
     assert_dgl_data(
+        adapter.db(),
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
@@ -107,12 +108,13 @@ def test_adb_collections_to_dgl(
     [(adbdgl_adapter, "fraud-detection")],
 )
 def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
-    arango_graph = db.graph(name)
+    arango_graph = adapter.db().graph(name)
     v_cols = arango_graph.vertex_collections()
     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
 
     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
     assert_dgl_data(
+        adapter.db(),
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
@@ -141,7 +143,9 @@ def test_dgl_to_adb(
     assert_arangodb_data(name, dgl_g, adb_g, is_default_type)
 
 
-def assert_dgl_data(dgl_g: DGLGraph, metagraph: ArangoMetagraph) -> None:
+def assert_dgl_data(
+    db: StandardDatabase, dgl_g: DGLGraph, metagraph: ArangoMetagraph
+) -> None:
     has_one_ntype = len(metagraph["vertexCollections"]) == 1
     has_one_etype = len(metagraph["edgeCollections"]) == 1
 
