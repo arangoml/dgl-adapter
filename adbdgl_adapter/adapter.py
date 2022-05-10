@@ -4,7 +4,6 @@
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Set, Union
 
-from arango import ArangoClient
 from arango.cursor import Cursor
 from arango.database import StandardDatabase
 from arango.graph import Graph as ArangoDBGraph
@@ -23,8 +22,8 @@ from .typings import ArangoMetagraph, DGLCanonicalEType, DGLDataDict, Json
 class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     """ArangoDB-DGL adapter.
 
-    :param conn: Connection details to an ArangoDB instance.
-    :type conn: adbdgl_adapter.typings.Json
+    :param db: A python-arango database instance
+    :type db: arango.database.StandardDatabase
     :param controller: The ArangoDB-DGL controller, for controlling how
         ArangoDB attributes are converted into DGL features, and vice-versa.
         Optionally re-defined by the user if needed (otherwise defaults to
@@ -35,27 +34,17 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
     def __init__(
         self,
-        conn: Json,
+        db: StandardDatabase,
         controller: ADBDGL_Controller = ADBDGL_Controller(),
     ):
-        self.__validate_attributes("connection", set(conn), self.CONNECTION_ATRIBS)
         if issubclass(type(controller), ADBDGL_Controller) is False:
             msg = "controller must inherit from ADBDGL_Controller"
             raise TypeError(msg)
 
-        username: str = conn["username"]
-        password: str = conn["password"]
-        db_name: str = conn["dbName"]
-        host: str = conn["hostname"]
-        protocol: str = conn.get("protocol", "https")
-        port = str(conn.get("port", 8529))
-
-        url = protocol + "://" + host + ":" + port
-
-        print(f"Connecting to {url}")
-        self.__db = ArangoClient(hosts=url).db(db_name, username, password, verify=True)
+        self.__db = db
         self.__cntrl: ADBDGL_Controller = controller
 
+    @property
     def db(self) -> StandardDatabase:
         return self.__db
 

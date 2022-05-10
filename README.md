@@ -37,36 +37,31 @@ pip install adbdgl-adapter
 
 For a more detailed walk-through, access the official notebook on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-
 ```py
 # Import the ArangoDB-DGL Adapter
 from adbdgl_adapter.adapter import ADBDGL_Adapter
 
+# Import the Python-Arango driver
+from arango import ArangoClient
+
 # Import a sample graph from DGL
 from dgl.data import KarateClubDataset
 
-# Store ArangoDB endpoint connection info
-# Assumption: the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
-con = {
-    "protocol": "http",
-    "hostname": "localhost",
-    "port": 8529,
-    "username": "root",
-    "password": "openSesame",
-    "dbName": "_system",
-}
+# Instantiate driver client based on user preference
+# Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
+db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="openSesame")
 
-# Instantiate the ADBDGL Adapter with connection credentials
-adbdgl_adapter = ADBDGL_Adapter(con)
+# Instantiate the ADBDGL Adapter with driver client
+adbdgl_adapter = ADBDGL_Adapter(db)
 
 # Convert ArangoDB to DGL via Graph Name
 dgl_fraud_graph = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
 
 # Convert ArangoDB to DGL via Collection Names
 dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
-        "fraud-detection", 
-        {"account", "Class", "customer"}, # Specify vertex collections
-        {"accountHolder", "Relationship", "transaction"}, # Specify edge collections
+    "fraud-detection",
+    {"account", "Class", "customer"},  # Specify vertex collections
+    {"accountHolder", "Relationship", "transaction"},  # Specify edge collections
 )
 
 # Convert ArangoDB to DGL via a Metagraph
@@ -94,16 +89,14 @@ Prerequisite: `arangorestore`
 1. `git clone https://github.com/arangoml/dgl-adapter.git`
 2. `cd dgl-adapter`
 3. (create virtual environment of choice)
-4. `pip install -e . pytest`
+4. `pip install -e .[dev]`
 5. (create an ArangoDB instance with method of choice)
-6. `pytest --protocol <> --host <> --port <> --dbName <> --username <> --password <>`
+6. `pytest --url <> --dbName <> --username <> --password <>`
 
 **Note**: A `pytest` parameter can be omitted if the endpoint is using its default value:
 ```python
 def pytest_addoption(parser):
-    parser.addoption("--protocol", action="store", default="http")
-    parser.addoption("--host", action="store", default="localhost")
-    parser.addoption("--port", action="store", default="8529")
+    parser.addoption("--url", action="store", default="http://localhost:8529")
     parser.addoption("--dbName", action="store", default="_system")
     parser.addoption("--username", action="store", default="root")
     parser.addoption("--password", action="store", default="openSesame")

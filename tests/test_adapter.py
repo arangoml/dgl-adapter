@@ -19,21 +19,6 @@ from .conftest import (
     get_lollipop_graph,
 )
 
-
-def test_validate_attributes() -> None:
-    bad_connection = {
-        "dbName": "_system",
-        "hostname": "localhost",
-        "protocol": "http",
-        "port": 8529,
-        # "username": "root",
-        # "password": "password",
-    }
-
-    with pytest.raises(ValueError):
-        ADBDGL_Adapter(bad_connection)
-
-
 def test_validate_controller_class() -> None:
     class Bad_ADBDGL_Controller:
         pass
@@ -71,7 +56,7 @@ def test_adb_to_dgl(
     adapter: ADBDGL_Adapter, name: str, metagraph: ArangoMetagraph
 ) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
-    assert_dgl_data(adapter.db(), dgl_g, metagraph)
+    assert_dgl_data(adapter.db, dgl_g, metagraph)
 
 
 @pytest.mark.parametrize(
@@ -94,7 +79,7 @@ def test_adb_collections_to_dgl(
         e_cols,
     )
     assert_dgl_data(
-        adapter.db(),
+        adapter.db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
@@ -108,13 +93,13 @@ def test_adb_collections_to_dgl(
     [(adbdgl_adapter, "fraud-detection")],
 )
 def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
-    arango_graph = adapter.db().graph(name)
+    arango_graph = adapter.db.graph(name)
     v_cols = arango_graph.vertex_collections()
     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
 
     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
     assert_dgl_data(
-        adapter.db(),
+        adapter.db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
