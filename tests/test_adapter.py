@@ -12,7 +12,7 @@ from adbdgl_adapter.typings import ArangoMetagraph
 
 from .conftest import (
     adbdgl_adapter,
-    con,
+    db,
     get_clique_graph,
     get_hypercube_graph,
     get_karate_graph,
@@ -26,12 +26,17 @@ def test_validate_attributes() -> None:
         adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
 
 
-def test_validate_controller_class() -> None:
+def test_validate_constructor() -> None:
+    bad_db: Dict[str, Any] = dict()
+
     class Bad_ADBDGL_Controller:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(con, Bad_ADBDGL_Controller())  # type: ignore
+        ADBDGL_Adapter(bad_db, Bad_ADBDGL_Controller())  # type: ignore
+
+    with pytest.raises(TypeError):
+        ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore
 
 
 @pytest.mark.parametrize(

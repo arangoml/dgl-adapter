@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from arango import ArangoClient
+from arango.database import StandardDatabase
 from dgl import DGLGraph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from torch import ones, rand, tensor, zeros
@@ -11,7 +12,7 @@ from torch import ones, rand, tensor, zeros
 from adbdgl_adapter.adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import Json
 
-con: Json
+db: StandardDatabase
 adbdgl_adapter: ADBDGL_Adapter
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -24,7 +25,6 @@ def pytest_addoption(parser: Any) -> None:
 
 
 def pytest_configure(config: Any) -> None:
-    global con
     con = {
         "url": config.getoption("url"),
         "username": config.getoption("username"),
@@ -39,10 +39,12 @@ def pytest_configure(config: Any) -> None:
     print("Database: " + con["dbName"])
     print("----------------------------------------")
 
-    global adbdgl_adapter
+    global db
     db = ArangoClient(hosts=con["url"]).db(
         con["dbName"], con["username"], con["password"]
     )
+
+    global adbdgl_adapter
     adbdgl_adapter = ADBDGL_Adapter(db)
 
     # Restore fraud dataset via arangorestore
@@ -69,13 +71,14 @@ def pytest_configure(config: Any) -> None:
 
 def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
-    tcp_url = "tcp://" + con["url"].partition("://")[-1]
+    protocol = "http+ssl://" if "https://" in con["url"] else "tcp://"
+    url = protocol + con["url"].partition("://")[-1]
 
     subprocess.check_call(
         f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
-            -c none --server.endpoint {tcp_url} --server.username {con["username"]} \
-                --server.database {con["dbName"]} --server.password {con["password"]} \
-                    --input-directory "{PROJECT_DIR}/{path_to_data}"',
+            -c none --server.endpoint {url} --server.username {con["username"]} \
+                            --server.database {con["dbName"]} --server.password {con["password"]} \
+                                --input-directory "{PROJECT_DIR}/{path_to_data}"',
         cwd=f"{PROJECT_DIR}/tests",
         shell=True,
     )

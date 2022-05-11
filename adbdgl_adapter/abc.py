@@ -62,17 +62,8 @@ class Abstract_ADBDGL_Adapter(ABC):
         return [("_N", "_E", "_N")]
 
     @property
-    def CONNECTION_ATRIBS(self) -> Set[str]:
-        return {"hostname", "username", "password", "dbName"}
-
-    @property
     def METAGRAPH_ATRIBS(self) -> Set[str]:
         return {"vertexCollections", "edgeCollections"}
-
-    @property
-    def EDGE_DEFINITION_ATRIBS(self) -> Set[str]:
-        return {"edge_collection", "from_vertex_collections", "to_vertex_collections"}
-
 
 class Abstract_ADBDGL_Controller(ABC):
     def _adb_attribute_to_dgl_feature(self, key: str, col: str, val: Any) -> Any:
