@@ -29,8 +29,13 @@ The Deep Graph Library (DGL) is an easy-to-use, high performance and scalable Py
 
 ## Installation
 
+#### Latest Release
 ```
 pip install adbdgl-adapter
+```
+#### Current State
+```
+pip install git+https://github.com/arangoml/dgl-adapter.git
 ```
 
 ##  Quickstart
