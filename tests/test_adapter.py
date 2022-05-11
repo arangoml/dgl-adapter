@@ -20,6 +20,12 @@ from .conftest import (
 )
 
 
+def test_validate_attributes() -> None:
+    with pytest.raises(ValueError):
+        bad_metagraph = {}
+        adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
+
+
 def test_validate_controller_class() -> None:
     class Bad_ADBDGL_Controller:
         pass
