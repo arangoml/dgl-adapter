@@ -1,4 +1,4 @@
-from typing import Set, Union
+from typing import Any, Dict, Set, Union
 
 import pytest
 from arango.database import StandardDatabase
@@ -22,7 +22,7 @@ from .conftest import (
 
 def test_validate_attributes() -> None:
     with pytest.raises(ValueError):
-        bad_metagraph = {}
+        bad_metagraph: Dict[str, Any] = dict()
         adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
 
 
