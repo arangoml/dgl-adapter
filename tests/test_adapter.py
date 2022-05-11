@@ -19,6 +19,7 @@ from .conftest import (
     get_lollipop_graph,
 )
 
+
 def test_validate_controller_class() -> None:
     class Bad_ADBDGL_Controller:
         pass

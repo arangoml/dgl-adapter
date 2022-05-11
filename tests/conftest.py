@@ -40,7 +40,9 @@ def pytest_configure(config: Any) -> None:
     print("----------------------------------------")
 
     global adbdgl_adapter
-    db = ArangoClient(hosts=con["url"]).db(con["dbName"], con["username"], con["password"])
+    db = ArangoClient(hosts=con["url"]).db(
+        con["dbName"], con["username"], con["password"]
+    )
     adbdgl_adapter = ADBDGL_Adapter(db)
 
     # Restore fraud dataset via arangorestore
@@ -67,7 +69,7 @@ def pytest_configure(config: Any) -> None:
 
 def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
-    tcp_url = 'tcp://' + con['url'].partition('://')[-1]
+    tcp_url = "tcp://" + con["url"].partition("://")[-1]
 
     subprocess.check_call(
         f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
