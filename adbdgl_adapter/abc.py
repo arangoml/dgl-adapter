@@ -65,6 +65,7 @@ class Abstract_ADBDGL_Adapter(ABC):
     def METAGRAPH_ATRIBS(self) -> Set[str]:
         return {"vertexCollections", "edgeCollections"}
 
+
 class Abstract_ADBDGL_Controller(ABC):
     def _adb_attribute_to_dgl_feature(self, key: str, col: str, val: Any) -> Any:
         raise NotImplementedError  # pragma: no cover
