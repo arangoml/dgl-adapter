@@ -41,7 +41,7 @@ def pytest_configure(config: Any) -> None:
 
     global db
     db = ArangoClient(hosts=con["url"]).db(
-        con["dbName"], con["username"], con["password"]
+        con["dbName"], con["username"], con["password"], verify=True
     )
 
     global adbdgl_adapter
@@ -73,11 +73,13 @@ def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
     protocol = "http+ssl://" if "https://" in con["url"] else "tcp://"
     url = protocol + con["url"].partition("://")[-1]
+    # A small hack to work around empty passwords
+    password = f"--server.password {con['password']}" if con["password"] else ""
 
     subprocess.check_call(
         f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
-            -c none --server.endpoint {url} --server.username {con["username"]} \
-                --server.database {con["dbName"]} --server.password {con["password"]} \
+            -c none --server.endpoint {url} --server.database {con["dbName"]} \
+                --server.username {con["username"]} {password} \
                     --input-directory "{PROJECT_DIR}/{path_to_data}"',
         cwd=f"{PROJECT_DIR}/tests",
         shell=True,
