@@ -33,7 +33,7 @@ def test_validate_constructor() -> None:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(bad_db, Bad_ADBDGL_Controller())  # type: ignore
+        ADBDGL_Adapter(bad_db)
 
     with pytest.raises(TypeError):
         ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore
