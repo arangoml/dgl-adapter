@@ -45,7 +45,7 @@ def pytest_configure(config: Any) -> None:
     )
 
     global adbdgl_adapter
-    adbdgl_adapter = ADBDGL_Adapter(db)
+    adbdgl_adapter = ADBDGL_Adapter(db, verbose=True)
 
     # Restore fraud dataset via arangorestore
     arango_restore(con, "examples/data/fraud_dump")
