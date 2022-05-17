@@ -14,10 +14,10 @@ from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
 from torch import tensor
 from torch.functional import Tensor
 
-from . import logger
 from .abc import Abstract_ADBDGL_Adapter
 from .controller import ADBDGL_Controller
 from .typings import ArangoMetagraph, DGLCanonicalEType, DGLDataDict, Json
+from .utils import logger
 
 
 class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
