@@ -7,7 +7,7 @@ from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
 from torch.functional import Tensor
 
-from adbdgl_adapter.adapter import ADBDGL_Adapter
+from adbdgl_adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import ArangoMetagraph
 
 from .conftest import (
