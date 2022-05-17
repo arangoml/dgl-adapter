@@ -19,6 +19,7 @@ setup(
     python_requires=">=3.6",
     license="Apache Software License",
     install_requires=[
+        "requests>=2.27.1",
         "dgl==0.6.1",
         "torch>=1.10.2",
         "python-arango>=7.3.1",
