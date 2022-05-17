@@ -1,4 +1,4 @@
-from typing import Set, Union
+from typing import Any, Dict, Set, Union
 
 import pytest
 from arango.database import StandardDatabase
@@ -12,7 +12,7 @@ from adbdgl_adapter.typings import ArangoMetagraph
 
 from .conftest import (
     adbdgl_adapter,
-    con,
+    db,
     get_clique_graph,
     get_hypercube_graph,
     get_karate_graph,
@@ -21,25 +21,22 @@ from .conftest import (
 
 
 def test_validate_attributes() -> None:
-    bad_connection = {
-        "dbName": "_system",
-        "hostname": "localhost",
-        "protocol": "http",
-        "port": 8529,
-        # "username": "root",
-        # "password": "password",
-    }
-
     with pytest.raises(ValueError):
-        ADBDGL_Adapter(bad_connection)
+        bad_metagraph: Dict[str, Any] = dict()
+        adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
 
 
-def test_validate_controller_class() -> None:
+def test_validate_constructor() -> None:
+    bad_db: Dict[str, Any] = dict()
+
     class Bad_ADBDGL_Controller:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(con, Bad_ADBDGL_Controller())  # type: ignore
+        ADBDGL_Adapter(bad_db, Bad_ADBDGL_Controller())  # type: ignore
+
+    with pytest.raises(TypeError):
+        ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -71,7 +68,7 @@ def test_adb_to_dgl(
     adapter: ADBDGL_Adapter, name: str, metagraph: ArangoMetagraph
 ) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
-    assert_dgl_data(adapter.db(), dgl_g, metagraph)
+    assert_dgl_data(adapter.db, dgl_g, metagraph)
 
 
 @pytest.mark.parametrize(
@@ -94,7 +91,7 @@ def test_adb_collections_to_dgl(
         e_cols,
     )
     assert_dgl_data(
-        adapter.db(),
+        adapter.db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
@@ -108,13 +105,13 @@ def test_adb_collections_to_dgl(
     [(adbdgl_adapter, "fraud-detection")],
 )
 def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
-    arango_graph = adapter.db().graph(name)
+    arango_graph = adapter.db.graph(name)
     v_cols = arango_graph.vertex_collections()
     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
 
     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
     assert_dgl_data(
-        adapter.db(),
+        adapter.db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},

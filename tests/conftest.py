@@ -3,6 +3,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from arango import ArangoClient
+from arango.database import StandardDatabase
 from dgl import DGLGraph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from torch import ones, rand, tensor, zeros
@@ -10,47 +12,47 @@ from torch import ones, rand, tensor, zeros
 from adbdgl_adapter.adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import Json
 
-con: Json
+db: StandardDatabase
 adbdgl_adapter: ADBDGL_Adapter
 PROJECT_DIR = Path(__file__).parent.parent
 
 
 def pytest_addoption(parser: Any) -> None:
-    parser.addoption("--protocol", action="store", default="http")
-    parser.addoption("--host", action="store", default="localhost")
-    parser.addoption("--port", action="store", default="8529")
+    parser.addoption("--url", action="store", default="http://localhost:8529")
     parser.addoption("--dbName", action="store", default="_system")
     parser.addoption("--username", action="store", default="root")
-    parser.addoption("--password", action="store", default="openSesame")
+    parser.addoption("--password", action="store", default="")
 
 
 def pytest_configure(config: Any) -> None:
-    global con
     con = {
-        "protocol": config.getoption("protocol"),
-        "hostname": config.getoption("host"),
-        "port": config.getoption("port"),
+        "url": config.getoption("url"),
         "username": config.getoption("username"),
         "password": config.getoption("password"),
         "dbName": config.getoption("dbName"),
     }
 
     print("----------------------------------------")
-    print(f"{con['protocol']}://{con['hostname']}:{con['port']}")
+    print("URL: " + con["url"])
     print("Username: " + con["username"])
     print("Password: " + con["password"])
     print("Database: " + con["dbName"])
     print("----------------------------------------")
 
+    global db
+    db = ArangoClient(hosts=con["url"]).db(
+        con["dbName"], con["username"], con["password"], verify=True
+    )
+
     global adbdgl_adapter
-    adbdgl_adapter = ADBDGL_Adapter(con)
+    adbdgl_adapter = ADBDGL_Adapter(db)
 
     # Restore fraud dataset via arangorestore
     arango_restore(con, "examples/data/fraud_dump")
 
     # Create Fraud Detection Graph
-    adbdgl_adapter.db().delete_graph("fraud-detection", ignore_missing=True)
-    adbdgl_adapter.db().create_graph(
+    adbdgl_adapter.db.delete_graph("fraud-detection", ignore_missing=True)
+    adbdgl_adapter.db.create_graph(
         "fraud-detection",
         edge_definitions=[
             {
@@ -69,13 +71,16 @@ def pytest_configure(config: Any) -> None:
 
 def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./assets/" if os.getenv("GITHUB_ACTIONS") else ""
+    protocol = "http+ssl://" if "https://" in con["url"] else "tcp://"
+    url = protocol + con["url"].partition("://")[-1]
+    # A small hack to work around empty passwords
+    password = f"--server.password {con['password']}" if con["password"] else ""
 
     subprocess.check_call(
         f'chmod -R 755 ./assets/arangorestore && {restore_prefix}arangorestore \
-            -c none --server.endpoint tcp://{con["hostname"]}:{con["port"]} \
-                --server.username {con["username"]} --server.database {con["dbName"]} \
-                    --server.password {con["password"]} \
-                        --input-directory "{PROJECT_DIR}/{path_to_data}"',
+            -c none --server.endpoint {url} --server.database {con["dbName"]} \
+                --server.username {con["username"]} {password} \
+                    --input-directory "{PROJECT_DIR}/{path_to_data}"',
         cwd=f"{PROJECT_DIR}/tests",
         shell=True,
     )
