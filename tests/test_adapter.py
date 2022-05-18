@@ -7,7 +7,7 @@ from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
 from torch.functional import Tensor
 
-from adbdgl_adapter.adapter import ADBDGL_Adapter
+from adbdgl_adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import ArangoMetagraph
 
 from .conftest import (
@@ -33,7 +33,7 @@ def test_validate_constructor() -> None:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(bad_db, Bad_ADBDGL_Controller())  # type: ignore
+        ADBDGL_Adapter(bad_db)
 
     with pytest.raises(TypeError):
         ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore

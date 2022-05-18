@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -9,7 +10,7 @@ from dgl import DGLGraph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from torch import ones, rand, tensor, zeros
 
-from adbdgl_adapter.adapter import ADBDGL_Adapter
+from adbdgl_adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import Json
 
 db: StandardDatabase
@@ -45,7 +46,7 @@ def pytest_configure(config: Any) -> None:
     )
 
     global adbdgl_adapter
-    adbdgl_adapter = ADBDGL_Adapter(db)
+    adbdgl_adapter = ADBDGL_Adapter(db, logging_lvl=logging.DEBUG)
 
     # Restore fraud dataset via arangorestore
     arango_restore(con, "examples/data/fraud_dump")

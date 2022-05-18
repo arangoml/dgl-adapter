@@ -44,7 +44,7 @@ For a more detailed walk-through, access the official notebook on Colab: <a href
 
 ```py
 # Import the ArangoDB-DGL Adapter
-from adbdgl_adapter.adapter import ADBDGL_Adapter
+from adbdgl_adapter import ADBDGL_Adapter
 
 # Import the Python-Arango driver
 from arango import ArangoClient

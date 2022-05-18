@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+import logging
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Set, Union
 
@@ -17,6 +17,7 @@ from torch.functional import Tensor
 from .abc import Abstract_ADBDGL_Adapter
 from .controller import ADBDGL_Controller
 from .typings import ArangoMetagraph, DGLCanonicalEType, DGLDataDict, Json
+from .utils import logger
 
 
 class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
@@ -29,14 +30,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         Optionally re-defined by the user if needed (otherwise defaults to
         ADBDGL_Controller).
     :type controller: adbdgl_adapter.controller.ADBDGL_Controller
-    :raise ValueError: If missing required keys in conn
+    :param logging_lvl: Defaults to logging.INFO. Other useful options are
+        logging.DEBUG (more verbose), and logging.WARNING (less verbose).
+    :type logging_lvl: str | int
+    :raise ValueError: If invalid parameters
     """
 
     def __init__(
         self,
         db: Database,
         controller: ADBDGL_Controller = ADBDGL_Controller(),
+        logging_lvl: Union[str, int] = logging.INFO,
     ):
+        self.set_logging(logging_lvl)
+
         if issubclass(type(db), Database) is False:
             msg = "**db** parameter must inherit from arango.database.Database"
             raise TypeError(msg)
@@ -48,9 +55,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         self.__db = db
         self.__cntrl: ADBDGL_Controller = controller
 
+        logger.info(f"Instantiated ADBDGL_Adapter with database '{db.name}'")
+
     @property
     def db(self) -> Database:
         return self.__db
+
+    def set_logging(self, level: Union[int, str]) -> None:
+        logger.setLevel(level)
 
     def arangodb_to_dgl(
         self, name: str, metagraph: ArangoMetagraph, **query_options: Any
@@ -86,6 +98,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             },
         }
         """
+        logger.debug(f"Starting arangodb_to_dgl({name}, ...):")
         self.__validate_attributes("graph", set(metagraph), self.METAGRAPH_ATRIBS)
 
         # Maps ArangoDB vertex IDs to DGL node IDs
@@ -98,6 +111,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         adb_v: Json
         for v_col, atribs in metagraph["vertexCollections"].items():
+            logger.debug(f"Preparing '{v_col}' vertices")
             for i, adb_v in enumerate(
                 self.__fetch_adb_docs(v_col, atribs, query_options)
             ):
@@ -112,6 +126,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         from_col: Set[str] = set()
         to_col: Set[str] = set()
         for e_col, atribs in metagraph["edgeCollections"].items():
+            logger.debug(f"Preparing '{e_col}' edges")
             from_nodes: List[int] = []
             to_nodes: List[int] = []
             for adb_e in self.__fetch_adb_docs(e_col, atribs, query_options):
@@ -140,11 +155,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         dgl_g: DGLHeteroGraph = heterograph(data_dict)
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.etypes) == 1
+        logger.debug(f"Is graph '{name}' homogenous? {has_one_ntype and has_one_etype}")
 
         self.__insert_dgl_features(ndata, dgl_g.ndata, has_one_ntype)
         self.__insert_dgl_features(edata, dgl_g.edata, has_one_etype)
 
-        print(f"DGL: {name} created")
+        logger.info(f"Created DGL '{name}' Graph")
         return dgl_g
 
     def arangodb_collections_to_dgl(
@@ -207,7 +223,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
+        logger.debug(f"Starting dgl_to_arangodb({name}, ...):")
         is_default = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
+        logger.debug(f"Is graph '{name}' using default canonical_etypes? {is_default}")
         adb_v_cols: List[str] = [name + dgl_g.ntypes[0]] if is_default else dgl_g.ntypes
         adb_e_cols: List[str] = [name + dgl_g.etypes[0]] if is_default else dgl_g.etypes
         e_definitions = self.etypes_to_edefinitions(
@@ -224,6 +242,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.etypes) == 1
+        logger.debug(f"Is graph '{name}' homogenous? {has_one_ntype and has_one_etype}")
 
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
         for v_col in adb_v_cols:
@@ -231,8 +250,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             v_col_docs = adb_documents[v_col]
 
             if self.__db.has_collection(v_col) is False:
+                logger.debug(f"Creating {v_col} vertex collection")
                 self.__db.create_collection(v_col)
 
+            logger.debug(f"Preparing {len(dgl_g.nodes(ntype))} '{v_col}' DGL nodes")
             node: Tensor
             for node in dgl_g.nodes(ntype):
                 dgl_node_id = node.item()
@@ -257,6 +278,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             e_col_docs = adb_documents[e_col]
 
             if self.__db.has_collection(e_col) is False:
+                logger.debug(f"Creating {e_col} edge collection")
                 self.__db.create_collection(e_col, edge=True)
 
             if is_default:
@@ -265,6 +287,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
 
             from_nodes, to_nodes = dgl_g.edges(etype=etype)
+            logger.debug(f"Preparing {len(from_nodes)} '{e_col}' DGL edges")
             for dgl_edge_id, (from_node, to_node) in enumerate(
                 zip(from_nodes, to_nodes)
             ):
@@ -288,9 +311,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
 
         for col, doc_list in adb_documents.items():  # insert remaining documents
+            logger.debug(f"Inserting last {len(doc_list)} documents into '{col}'")
             self.__db.collection(col).import_bulk(doc_list, on_duplicate="replace")
 
-        print(f"ArangoDB: {name} created")
+        logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
 
     def etypes_to_edefinitions(
@@ -372,6 +396,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         col_dict: Dict[str, List[Any]]
         for key, col_dict in features_data.items():
             for col, array in col_dict.items():
+                logger.debug(f"Inserting {len(array)} '{key}' features into '{col}'")
                 data[key] = (
                     tensor(array) if has_one_type else {**data[key], col: tensor(array)}
                 )
@@ -428,6 +453,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         col_docs.append(doc)
 
         if len(col_docs) >= batch_size:
+            logger.debug(f"Inserting next {batch_size} batch documents into '{col}'")
             self.__db.collection(col).import_bulk(col_docs, on_duplicate="replace")
             col_docs.clear()
 
