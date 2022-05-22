@@ -6,10 +6,9 @@ from typing import Any, DefaultDict, Dict, List, Set, Union
 
 from arango.cursor import Cursor
 from arango.database import Database
-from arango.graph import Graph as ArangoDBGraph
+from arango.graph import Graph as ADBGraph
 from arango.result import Result
-from dgl import DGLGraph, heterograph
-from dgl.heterograph import DGLHeteroGraph
+from dgl import DGLGraph, DGLHeteroGraph, heterograph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
 from torch import tensor
 from torch.functional import Tensor
@@ -60,6 +59,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     @property
     def db(self) -> Database:
         return self.__db
+
+    @property
+    def cntrl(self) -> ADBDGL_Controller:
+        return self.__cntrl
 
     def set_logging(self, level: Union[int, str]) -> None:
         logger.setLevel(level)
@@ -211,7 +214,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
     def dgl_to_arangodb(
         self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int = 1000
-    ) -> ArangoDBGraph:
+    ) -> ADBGraph:
         """Create an ArangoDB graph from a DGL graph.
 
         :param name: The ArangoDB graph name.
@@ -308,7 +311,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
 
         self.__db.delete_graph(name, ignore_missing=True)
-        adb_graph: ArangoDBGraph = self.__db.create_graph(name, e_definitions)
+        adb_graph: ADBGraph = self.__db.create_graph(name, e_definitions)
 
         for col, doc_list in adb_documents.items():  # insert remaining documents
             logger.debug(f"Inserting last {len(doc_list)} documents into '{col}'")
