@@ -58,11 +58,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
     @property
     def db(self) -> Database:
-        return self.__db
+        return self.__db  # pragma: no cover
 
     @property
     def cntrl(self) -> ADBDGL_Controller:
-        return self.__cntrl
+        return self.__cntrl  # pragma: no cover
 
     def set_logging(self, level: Union[int, str]) -> None:
         logger.setLevel(level)
