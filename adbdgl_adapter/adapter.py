@@ -241,7 +241,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_graph: ADBGraph = self.__db.create_graph(name, edge_definitions)
 
         adb_v_cols = adb_graph.vertex_collections()
-        adb_e_cols = {e_d["edge_collection"] for e_d in edge_definitions}
+        adb_e_cols = [e_d["edge_collection"] for e_d in edge_definitions]
 
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.etypes) == 1
