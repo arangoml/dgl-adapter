@@ -105,7 +105,7 @@ def test_adb_collections_to_dgl(
     [(adbdgl_adapter, "fraud-detection")],
 )
 def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
-    arango_graph = adapter.db.graph(name)
+    arango_graph = db.graph(name)
     v_cols = arango_graph.vertex_collections()
     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
 

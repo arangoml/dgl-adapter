@@ -227,21 +227,21 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :rtype: arango.graph.Graph
         """
         logger.debug(f"Starting dgl_to_arangodb({name}, ...):")
+
         is_default = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
         logger.debug(f"Is graph '{name}' using default canonical_etypes? {is_default}")
-        adb_v_cols: List[str] = [name + dgl_g.ntypes[0]] if is_default else dgl_g.ntypes
-        adb_e_cols: List[str] = [name + dgl_g.etypes[0]] if is_default else dgl_g.etypes
-        e_definitions = self.etypes_to_edefinitions(
-            [
-                (
-                    adb_v_cols[0],
-                    adb_e_cols[0],
-                    adb_v_cols[0],
-                )
-            ]
+
+        edge_definitions = self.etypes_to_edefinitions(
+            [(name + "_N", name + "_E", name + "_N")]
             if is_default
             else dgl_g.canonical_etypes
         )
+
+        self.__db.delete_graph(name, ignore_missing=True)
+        adb_graph: ADBGraph = self.__db.create_graph(name, edge_definitions)
+
+        adb_v_cols = adb_graph.vertex_collections()
+        adb_e_cols = {e_d["edge_collection"] for e_d in edge_definitions}
 
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.etypes) == 1
@@ -251,10 +251,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for v_col in adb_v_cols:
             ntype = None if is_default else v_col
             v_col_docs = adb_documents[v_col]
-
-            if self.__db.has_collection(v_col) is False:
-                logger.debug(f"Creating {v_col} vertex collection")
-                self.__db.create_collection(v_col)
 
             logger.debug(f"Preparing {len(dgl_g.nodes(ntype))} '{v_col}' DGL nodes")
             node: Tensor
@@ -279,10 +275,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for e_col in adb_e_cols:
             etype = None if is_default else e_col
             e_col_docs = adb_documents[e_col]
-
-            if self.__db.has_collection(e_col) is False:
-                logger.debug(f"Creating {e_col} edge collection")
-                self.__db.create_collection(e_col, edge=True)
 
             if is_default:
                 from_col = to_col = adb_v_cols[0]
@@ -310,12 +302,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
                 self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
 
-        self.__db.delete_graph(name, ignore_missing=True)
-        adb_graph: ADBGraph = self.__db.create_graph(name, e_definitions)
-
         for col, doc_list in adb_documents.items():  # insert remaining documents
-            logger.debug(f"Inserting last {len(doc_list)} documents into '{col}'")
-            self.__db.collection(col).import_bulk(doc_list, on_duplicate="replace")
+            if doc_list:
+                logger.debug(f"Inserting last {len(doc_list)} documents into '{col}'")
+                self.__db.collection(col).import_bulk(doc_list, on_duplicate="replace")
 
         logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
