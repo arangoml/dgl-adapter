@@ -243,9 +243,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_v_cols = adb_graph.vertex_collections()
         adb_e_cols = [e_d["edge_collection"] for e_d in edge_definitions]
 
-        has_one_ntype = len(dgl_g.ntypes) == 1
-        has_one_etype = len(dgl_g.etypes) == 1
-        logger.debug(f"Is graph '{name}' homogenous? {has_one_ntype and has_one_etype}")
+        has_one_vcol = len(adb_v_cols) == 1
+        has_one_ecol = len(has_one_ecol) == 1
+        logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
         for v_col in adb_v_cols:
@@ -263,7 +263,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     dgl_node_id,
                     adb_vertex,
                     v_col,
-                    has_one_ntype,
+                    has_one_vcol,
                 )
 
                 self.__insert_adb_docs(v_col, v_col_docs, adb_vertex, batch_size)
