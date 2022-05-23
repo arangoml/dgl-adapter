@@ -244,7 +244,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_e_cols = [e_d["edge_collection"] for e_d in edge_definitions]
 
         has_one_vcol = len(adb_v_cols) == 1
-        has_one_ecol = len(has_one_ecol) == 1
+        has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
@@ -297,7 +297,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     dgl_edge_id,
                     adb_edge,
                     e_col,
-                    has_one_etype,
+                    has_one_ecol,
                 )
 
                 self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
@@ -401,7 +401,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         id: Union[int, float, bool],
         doc: Json,
         col: str,
-        has_one_type: bool,
+        has_one_col: bool,
     ) -> None:
         """Convert DGL features into a set of ArangoDB attributes for a given document
 
@@ -416,12 +416,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type doc: adbdgl_adapter.typings.Json
         :param col: The collection the current document belongs to
         :type col: str
-        :param has_one_type: Set to True if the DGL graph only has one ntype,
-            or one etype.
-        :type has_one_type: bool
+        :param has_one_col: Set to True if the ArangoDB graph has one
+            vertex collection or one edge collection only.
+        :type has_one_col: bool
         """
         for key in features:
-            tensor = data[key] if has_one_type else data[key][col]
+            tensor = data[key] if has_one_col else data[key][col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
     def __insert_adb_docs(
