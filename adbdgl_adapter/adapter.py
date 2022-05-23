@@ -116,7 +116,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for v_col, atribs in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
             for i, adb_v in enumerate(
-                self.__fetch_adb_docs(v_col, atribs, query_options)
+                self.__fetch_adb_docs(v_col, atribs, query_options), 1
             ):
                 adb_map[adb_v["_id"]] = {
                     "id": i,
@@ -284,7 +284,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             from_nodes, to_nodes = dgl_g.edges(etype=etype)
             logger.debug(f"Preparing {len(from_nodes)} '{e_col}' DGL edges")
             for dgl_edge_id, (from_node, to_node) in enumerate(
-                zip(from_nodes, to_nodes)
+                zip(from_nodes, to_nodes), 1
             ):
                 adb_edge = {
                     "_key": str(dgl_edge_id),
