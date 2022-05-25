@@ -1,3 +1,150 @@
+## 2.0.0 (2022-05-25)
+
+### New
+
+* Notebook prep for 2.0.0 release (#18) [Anthony Mahanna]
+
+  * #16: initial commit
+
+  * nbstripout
+
+* Verbose Logging (#17) [Anthony Mahanna]
+
+  * #13: initial commit
+
+  * Update ArangoDB_DGL_Adapter.ipynb
+
+  * Revert "Update ArangoDB_DGL_Adapter.ipynb"
+
+  This reverts commit 24059fe2ab74d5d879c990b3b10e8d094bd04518.
+
+  * fix: black
+
+  * new: validate_attributes test case
+
+  * Update README.md
+
+  * fix: mypy
+
+  * cleanup
+
+  * fix: black
+
+  * Update release.yml
+
+  * cleanup
+
+  * fix: set default password to empty string
+
+  * set empty password
+
+  * #14: initial commit
+
+  * cleanup
+
+  * cleanup release.yml
+
+  * new: import shortcut
+
+  * cleanup
+
+  * fix: switch back to manual changelog merge
+
+  * replace: set_verbose with set_logging
+
+* Expose ArangoClient & StandardDatabase from adapter (#15) [Anthony Mahanna]
+
+  * #13: initial commit
+
+  * Update ArangoDB_DGL_Adapter.ipynb
+
+  * Revert "Update ArangoDB_DGL_Adapter.ipynb"
+
+  This reverts commit 24059fe2ab74d5d879c990b3b10e8d094bd04518.
+
+  * fix: black
+
+  * new: validate_attributes test case
+
+  * Update README.md
+
+  * fix: mypy
+
+  * cleanup
+
+  * fix: black
+
+  * Update release.yml
+
+  * cleanup
+
+  * fix: set default password to empty string
+
+  * set empty password
+
+  * new: specify requests dep
+
+* Docker-based testing (#12) [Anthony Mahanna]
+
+  * initial commit
+
+  * fix: typo
+
+  * Update conftest.py
+
+  * fix: isort
+
+  * temp: disable mypy
+
+  * attempt: mypy fix
+
+  * remove: unused import
+
+  * cleanup
+
+  * bump python-arango and torch versions
+
+  * lower python-arango version
+
+  * lower torch version
+
+  * Update README.md
+
+  * fix: password typo
+
+  * Update README.md
+
+  * Update conftest.py
+
+  * Update conftest.py
+
+  * Update setup.py
+
+### Fix
+
+* Flake8. [aMahanna]
+
+* Var name. [aMahanna]
+
+* Edge_collection retrieval. [aMahanna]
+
+### Other
+
+* Revert "update: start enumerate() at 1" [aMahanna]
+
+  This reverts commit 7422187993933ec60c718cf06dcdbd8fcec812db.
+
+* Update: start enumerate() at 1. [aMahanna]
+
+* Update: build & analyze triggers. [aMahanna]
+
+* Pragma no cover. [aMahanna]
+
+* (more) minor cleanup. [aMahanna]
+
+* Minor cleanup. [aMahanna]
+
+
 ## 1.0.2 (2021-12-31)
 
 ### New
