@@ -17,6 +17,7 @@ from .conftest import (
     get_hypercube_graph,
     get_karate_graph,
     get_lollipop_graph,
+    get_social_graph,
 )
 
 
@@ -127,6 +128,7 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
         (adbdgl_adapter, "Lollipop", get_lollipop_graph(), True, 1000),
         (adbdgl_adapter, "Hypercube", get_hypercube_graph(), True, 1000),
         (adbdgl_adapter, "Karate", get_karate_graph(), True, 1000),
+        (adbdgl_adapter, "Social", get_social_graph(), False, 1000),
     ],
 )
 def test_dgl_to_adb(
