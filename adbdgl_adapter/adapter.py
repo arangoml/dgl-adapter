@@ -428,7 +428,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param canonical_etype: The DGL canonical edge type belonging to the current
             **col**, provided that **col** is an edge collection (ignored otherwise).
         :type canonical_etype: adbdgl_adapter.typings.DGLCanonicalEType
-        :type has_one_col: bool
         """
         for key in features:
             tensor = data[key] if has_one_col else data[key][canonical_etype or col]
