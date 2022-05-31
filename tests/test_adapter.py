@@ -122,24 +122,23 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, is_default_type, batch_size",
+    "adapter, name, dgl_g, batch_size",
     [
-        (adbdgl_adapter, "Clique", get_clique_graph(), True, 3),
-        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), True, 1000),
-        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), True, 1000),
-        (adbdgl_adapter, "Karate", get_karate_graph(), True, 1000),
-        (adbdgl_adapter, "Social", get_social_graph(), False, 1000),
+        (adbdgl_adapter, "Clique", get_clique_graph(), 3),
+        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), 1000),
+        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), 1000),
+        (adbdgl_adapter, "Karate", get_karate_graph(), 1000),
+        (adbdgl_adapter, "Social", get_social_graph(), 1000),
     ],
 )
 def test_dgl_to_adb(
     adapter: ADBDGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
-    is_default_type: bool,
     batch_size: int,
 ) -> None:
     adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
-    assert_arangodb_data(name, dgl_g, adb_g, is_default_type)
+    assert_arangodb_data(name, dgl_g, adb_g)
 
 
 def assert_dgl_data(
@@ -178,8 +177,9 @@ def assert_arangodb_data(
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     adb_g: ArangoGraph,
-    is_default_type: bool,
 ) -> None:
+    is_default_type = dgl_g.canonical_etypes == adbdgl_adapter.DEFAULT_CANONICAL_ETYPE
+
     for dgl_v_col in dgl_g.ntypes:
         adb_v_col = name + dgl_v_col if is_default_type else dgl_v_col
         attributes = dgl_g.node_attr_schemes(
