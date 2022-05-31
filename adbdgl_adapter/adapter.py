@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Set, Union
+from typing import Any, DefaultDict, Dict, List, Optional, Set, Union
 
 from arango.cursor import Cursor
 from arango.database import Database
@@ -251,6 +251,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for v_col in adb_v_cols:
             ntype = None if is_default else v_col
             v_col_docs = adb_documents[v_col]
+            features = dgl_g.node_attr_schemes(ntype).keys()
 
             logger.debug(f"Preparing {len(dgl_g.nodes(ntype))} '{v_col}' DGL nodes")
             node: Tensor
@@ -259,7 +260,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 adb_vertex = {"_key": str(dgl_node_id)}
                 self.__prepare_adb_attributes(
                     dgl_g.ndata,
-                    dgl_g.node_attr_schemes(ntype).keys(),
+                    features,
                     dgl_node_id,
                     adb_vertex,
                     v_col,
@@ -275,11 +276,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for e_col in adb_e_cols:
             etype = None if is_default else e_col
             e_col_docs = adb_documents[e_col]
+            features = dgl_g.edge_attr_schemes(etype).keys()
 
+            canonical_etype = None
             if is_default:
                 from_col = to_col = adb_v_cols[0]
             else:
-                from_col, _, to_col = dgl_g.to_canonical_etype(e_col)
+                canonical_etype = dgl_g.to_canonical_etype(e_col)
+                from_col, _, to_col = canonical_etype
 
             from_nodes, to_nodes = dgl_g.edges(etype=etype)
             logger.debug(f"Preparing {len(from_nodes)} '{e_col}' DGL edges")
@@ -293,11 +297,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
-                    dgl_g.edge_attr_schemes(etype).keys(),
+                    features,
                     dgl_edge_id,
                     adb_edge,
                     e_col,
                     has_one_ecol,
+                    canonical_etype,
                 )
 
                 self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
@@ -402,6 +407,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         doc: Json,
         col: str,
         has_one_col: bool,
+        canonical_etype: Optional[DGLCanonicalEType] = None,
     ) -> None:
         """Convert DGL features into a set of ArangoDB attributes for a given document
 
@@ -419,9 +425,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param has_one_col: Set to True if the ArangoDB graph has one
             vertex collection or one edge collection only.
         :type has_one_col: bool
+        :param canonical_etype: The DGL canonical edge type belonging to the current
+            **col**, provided that **col** is an edge collection (ignored otherwise).
+        :type canonical_etype: adbdgl_adapter.typings.DGLCanonicalEType
         """
         for key in features:
-            tensor = data[key] if has_one_col else data[key][col]
+            tensor = data[key] if has_one_col else data[key][canonical_etype or col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
     def __insert_adb_docs(

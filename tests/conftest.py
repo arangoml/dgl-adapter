@@ -6,7 +6,7 @@ from typing import Any
 
 from arango import ArangoClient
 from arango.database import StandardDatabase
-from dgl import DGLGraph, remove_self_loop
+from dgl import DGLGraph, heterograph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from torch import ones, rand, tensor, zeros
 
@@ -113,4 +113,19 @@ def get_clique_graph() -> DGLGraph:
     dgl_g = remove_self_loop(MiniGCDataset(8, 6, 7)[6][0])
     dgl_g.ndata["random_ndata"] = ones(dgl_g.num_nodes())
     dgl_g.edata["random_edata"] = zeros(dgl_g.num_edges())
+    return dgl_g
+
+
+def get_social_graph() -> DGLGraph:
+    dgl_g = heterograph(
+        {
+            ("user", "follows", "user"): (tensor([0, 1]), tensor([1, 2])),
+            ("user", "likes", "game"): (tensor([0, 1, 2]), tensor([0, 1, 2])),
+            ("user", "plays", "game"): (tensor([1, 3]), tensor([1, 2])),
+        }
+    )
+
+    dgl_g.nodes["user"].data["age"] = tensor([21, 16, 38, 64])
+    dgl_g.edges["plays"].data["hours_played"] = tensor([3, 5])
+
     return dgl_g
