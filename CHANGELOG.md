@@ -1,3 +1,28 @@
+## 2.0.1 (2022-05-31)
+
+### Fix
+
+* Can't convert DGL heterograph with edge attributes into ArangoDB (#21) [Anthony Mahanna]
+
+  * fix: #20
+
+  * new: test case for #20
+
+  * update: notebook version
+
+  * remove: duplicate docstring
+
+  * cleanup: test_dgl_to_adb
+
+  * fix: notebook typo
+
+### Other
+
+* Changelog: release 2.0.0 (#19) [github-actions[bot]]
+
+  !gitchangelog
+
+
 ## 2.0.0 (2022-05-25)
 
 ### New
