@@ -40,7 +40,9 @@ pip install git+https://github.com/arangoml/dgl-adapter.git
 
 ##  Quickstart
 
-For a more detailed walk-through, access the official notebook on Colab: <a href="https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+[![Open In Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arangoml/dgl-adapter/blob/master/examples/ArangoDB_DGL_Adapter.ipynb)
+
+Also available as an ArangoDB's Lunch & Learn session: [Graph & Beyond Course #2.8](https://www.arangodb.com/resources/lunch-sessions/graph-beyond-lunch-break-2-8-dgl-adapter/)
 
 ```py
 # Import the ArangoDB-DGL Adapter
