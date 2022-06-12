@@ -213,7 +213,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
 
     def dgl_to_arangodb(
-        self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int = 1000
+        self,
+        name: str,
+        dgl_g: Union[DGLGraph, DGLHeteroGraph],
+        batch_size: int = 1000,
+        overwrite: bool = False,
+        **graph_options: Any,
     ) -> ADBGraph:
         """Create an ArangoDB graph from a DGL graph.
 
@@ -223,6 +228,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type dgl_g: Union[dgl.DGLGraph, dgl.heterograph.DGLHeteroGraph]
         :param batch_size: The maximum number of documents to insert at once
         :type batch_size: int
+        :param overwrite: If set to True, will first delete the existing
+            graph, and drop its collections.
+        :param overwrite: bool
+        :param graph_options: Keyword arguments to specify additional
+            parameters for creating the ArangoDB graph via the
+            python-arango create_graph() function
+            (e.g smart graph, orphan collections, sharding, ...)
+        :type graph_options: Any
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
@@ -237,8 +250,15 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             else dgl_g.canonical_etypes
         )
 
-        self.__db.delete_graph(name, ignore_missing=True)
-        adb_graph: ADBGraph = self.__db.create_graph(name, edge_definitions)
+        if overwrite:
+            logger.debug("Overwrite is True. Deleting existing graph & collections.")
+            self.__db.delete_graph(name, drop_collections=True, ignore_missing=True)
+
+        adb_graph = (
+            self.__db.graph(name)
+            if self.__db.has_graph(name)
+            else self.__db.create_graph(name, edge_definitions, **graph_options)
+        )
 
         adb_v_cols = adb_graph.vertex_collections()
         adb_e_cols = [e_d["edge_collection"] for e_d in edge_definitions]

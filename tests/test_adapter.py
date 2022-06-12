@@ -122,13 +122,13 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, batch_size",
+    "adapter, name, dgl_g, batch_size, overwrite",
     [
-        (adbdgl_adapter, "Clique", get_clique_graph(), 3),
-        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), 1000),
-        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), 1000),
-        (adbdgl_adapter, "Karate", get_karate_graph(), 1000),
-        (adbdgl_adapter, "Social", get_social_graph(), 1000),
+        (adbdgl_adapter, "Clique", get_clique_graph(), 3, False),
+        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), 1000, False),
+        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), 1000, False),
+        (adbdgl_adapter, "Karate", get_karate_graph(), 1000, False),
+        (adbdgl_adapter, "Social", get_social_graph(), 1000, True),
     ],
 )
 def test_dgl_to_adb(
@@ -136,8 +136,9 @@ def test_dgl_to_adb(
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
     batch_size: int,
+    overwrite: bool,
 ) -> None:
-    adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
+    adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size, overwrite)
     assert_arangodb_data(name, dgl_g, adb_g)
 
 
