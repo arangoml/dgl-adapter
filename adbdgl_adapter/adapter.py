@@ -415,9 +415,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for key, col_dict in features_data.items():
             for col, array in col_dict.items():
                 logger.debug(f"Inserting {len(array)} '{key}' features into '{col}'")
-                data[key] = (
-                    tensor(array) if has_one_type else {**data[key], col: tensor(array)}
-                )
+                data[key] = tensor(array) if has_one_type else {col: tensor(array)}
 
     def __prepare_adb_attributes(
         self,
