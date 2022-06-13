@@ -56,7 +56,7 @@ from dgl.data import KarateClubDataset
 
 # Instantiate driver client based on user preference
 # Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
-db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="openSesame")
+db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="")
 
 # Instantiate the ADBDGL Adapter with driver client
 adbdgl_adapter = ADBDGL_Adapter(db)
