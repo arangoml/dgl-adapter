@@ -138,7 +138,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 from_col.add(from_node["col"])
                 to_col.add(to_node["col"])
                 if len(from_col | to_col) > 2:
-                    raise ValueError( # pragma: no cover
+                    raise ValueError(  # pragma: no cover
                         f"""Can't convert to DGL:
                             too many '_from' & '_to' collections in {e_col}
                         """
