@@ -21,12 +21,6 @@ from .conftest import (
 )
 
 
-def test_validate_attributes() -> None:
-    with pytest.raises(ValueError):
-        bad_metagraph: Dict[str, Any] = dict()
-        adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
-
-
 def test_validate_constructor() -> None:
     bad_db: Dict[str, Any] = dict()
 

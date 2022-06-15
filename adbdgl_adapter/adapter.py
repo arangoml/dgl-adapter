@@ -102,7 +102,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         }
         """
         logger.debug(f"Starting arangodb_to_dgl({name}, ...):")
-        self.__validate_attributes("graph", set(metagraph), self.METAGRAPH_ATRIBS)
 
         # Maps ArangoDB vertex IDs to DGL node IDs
         adb_map: Dict[str, Dict[str, Any]] = dict()
@@ -502,22 +501,3 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """
 
         return self.__db.aql.execute(aql, **query_options)
-
-    def __validate_attributes(
-        self, type: str, attributes: Set[str], valid_attributes: Set[str]
-    ) -> None:
-        """Validates that a set of attributes includes the required valid
-        attributes.
-
-        :param type: The context of the attribute validation
-            (e.g connection attributes, graph attributes, etc).
-        :type type: str
-        :param attributes: The provided attributes, possibly invalid.
-        :type attributes: Set[str]
-        :param valid_attributes: The valid attributes.
-        :type valid_attributes: Set[str]
-        :raise ValueError: If **valid_attributes** is not a subset of **attributes**
-        """
-        if valid_attributes.issubset(attributes) is False:
-            missing_attributes = valid_attributes - attributes
-            raise ValueError(f"Missing {type} attributes: {missing_attributes}")

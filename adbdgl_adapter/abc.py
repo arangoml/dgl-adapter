@@ -54,16 +54,9 @@ class Abstract_ADBDGL_Adapter(ABC):
     def __fetch_adb_docs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def __validate_attributes(self) -> None:
-        raise NotImplementedError  # pragma: no cover
-
     @property
     def DEFAULT_CANONICAL_ETYPE(self) -> List[DGLCanonicalEType]:
         return [("_N", "_E", "_N")]
-
-    @property
-    def METAGRAPH_ATRIBS(self) -> Set[str]:
-        return {"vertexCollections", "edgeCollections"}
 
 
 class Abstract_ADBDGL_Controller(ABC):
