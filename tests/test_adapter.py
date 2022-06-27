@@ -116,23 +116,35 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, batch_size, overwrite",
+    "adapter, name, dgl_g, overwrite_graph, import_options",
     [
-        (adbdgl_adapter, "Clique", get_clique_graph(), 3, False),
-        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), 1000, False),
-        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), 1000, False),
-        (adbdgl_adapter, "Karate", get_karate_graph(), 1000, False),
-        (adbdgl_adapter, "Social", get_social_graph(), 1000, True),
+        (
+            adbdgl_adapter,
+            "Clique",
+            get_clique_graph(),
+            False,
+            {"batch_size": 3, "on_duplicate": "replace"},
+        ),
+        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), False, {"overwrite": True}),
+        (
+            adbdgl_adapter,
+            "Hypercube",
+            get_hypercube_graph(),
+            False,
+            {"overwrite": True},
+        ),
+        (adbdgl_adapter, "Karate", get_karate_graph(), False, {"overwrite": True}),
+        (adbdgl_adapter, "Social", get_social_graph(), True, {"overwrite": True}),
     ],
 )
 def test_dgl_to_adb(
     adapter: ADBDGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
-    batch_size: int,
-    overwrite: bool,
+    overwrite_graph: bool,
+    import_options: Any,
 ) -> None:
-    adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size, overwrite)
+    adb_g = adapter.dgl_to_arangodb(name, dgl_g, overwrite_graph, **import_options)
     assert_arangodb_data(name, dgl_g, adb_g)
 
 

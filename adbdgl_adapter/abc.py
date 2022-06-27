@@ -30,7 +30,11 @@ class Abstract_ADBDGL_Adapter(ABC):
         raise NotImplementedError  # pragma: no cover
 
     def dgl_to_arangodb(
-        self, name: str, dgl_g: Union[DGLGraph, DGLHeteroGraph], batch_size: int
+        self,
+        name: str,
+        dgl_g: Union[DGLGraph, DGLHeteroGraph],
+        overwrite_graph: bool = False,
+        **import_options: Any,
     ) -> ArangoDBGraph:
         raise NotImplementedError  # pragma: no cover
 
@@ -46,9 +50,6 @@ class Abstract_ADBDGL_Adapter(ABC):
         raise NotImplementedError  # pragma: no cover
 
     def __prepare_adb_attributes(self) -> None:
-        raise NotImplementedError  # pragma: no cover
-
-    def __insert_adb_docs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
     def __fetch_adb_docs(self) -> None:

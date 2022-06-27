@@ -20,7 +20,7 @@ setup(
         "requests>=2.27.1",
         "dgl>=0.6.1",
         "torch>=1.10.2",
-        "python-arango>=7.3.1",
+        "python-arango>=7.4.0",
         "setuptools>=45",
     ],
     extras_require={
@@ -41,7 +41,6 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

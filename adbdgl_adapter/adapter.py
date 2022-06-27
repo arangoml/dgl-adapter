@@ -215,9 +215,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         self,
         name: str,
         dgl_g: Union[DGLGraph, DGLHeteroGraph],
-        batch_size: int = 1000,
-        overwrite: bool = False,
-        **graph_options: Any,
+        overwrite_graph: bool = False,
+        **import_options: Any,
     ) -> ADBGraph:
         """Create an ArangoDB graph from a DGL graph.
 
@@ -225,16 +224,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type name: str
         :param dgl_g: The existing DGL graph.
         :type dgl_g: Union[dgl.DGLGraph, dgl.heterograph.DGLHeteroGraph]
-        :param batch_size: The maximum number of documents to insert at once
-        :type batch_size: int
-        :param overwrite: If set to True, will first delete the existing
-            graph, and drop its collections.
-        :param overwrite: bool
-        :param graph_options: Keyword arguments to specify additional
-            parameters for creating the ArangoDB graph via the
-            python-arango create_graph() function
-            (e.g smart graph, orphan collections, sharding, ...)
-        :type graph_options: Any
+        :param overwrite_graph: Overwrites the graph if it already exists.
+            Does not drop associated collections.
+        :type overwrite_graph: bool
+        :param import_options: Keyword arguments to specify additional
+            parameters for ArangoDB document insertion. See
+            arango.collection.Collection.import_bulk for all options.
+        :type import_options: Any
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
@@ -249,15 +245,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             else dgl_g.canonical_etypes
         )
 
-        if overwrite:
-            logger.debug("Overwrite is True. Deleting existing graph & collections.")
-            self.__db.delete_graph(name, drop_collections=True, ignore_missing=True)
+        if overwrite_graph:
+            logger.debug("Overwrite graph flag is True. Deleting old graph.")
+            self.__db.delete_graph(name, ignore_missing=True)
 
-        adb_graph = (
-            self.__db.graph(name)
-            if self.__db.has_graph(name)
-            else self.__db.create_graph(name, edge_definitions, **graph_options)
-        )
+        if self.__db.has_graph(name):
+            adb_graph = self.__db.graph(name)
+        else:
+            adb_graph = self.__db.create_graph(name, edge_definitions)
 
         adb_v_cols = adb_graph.vertex_collections()
         adb_e_cols = [e_d["edge_collection"] for e_d in edge_definitions]
@@ -267,13 +262,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
+
         for v_col in adb_v_cols:
-            ntype = None if is_default else v_col
             v_col_docs = adb_documents[v_col]
+            ntype = None if is_default else v_col
             features = dgl_g.node_attr_schemes(ntype).keys()
 
-            logger.debug(f"Preparing {len(dgl_g.nodes(ntype))} '{v_col}' DGL nodes")
             node: Tensor
+            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
             for node in dgl_g.nodes(ntype):
                 dgl_node_id = node.item()
                 adb_vertex = {"_key": str(dgl_node_id)}
@@ -286,15 +282,15 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     has_one_vcol,
                 )
 
-                self.__insert_adb_docs(v_col, v_col_docs, adb_vertex, batch_size)
+                v_col_docs.append(adb_vertex)
 
         from_col: str
         to_col: str
-        from_nodes: Tensor
-        to_nodes: Tensor
+        from_n: Tensor
+        to_n: Tensor
         for e_col in adb_e_cols:
-            etype = None if is_default else e_col
             e_col_docs = adb_documents[e_col]
+            etype = None if is_default else e_col
             features = dgl_g.edge_attr_schemes(etype).keys()
 
             canonical_etype = None
@@ -304,32 +300,29 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 canonical_etype = dgl_g.to_canonical_etype(e_col)
                 from_col, _, to_col = canonical_etype
 
-            from_nodes, to_nodes = dgl_g.edges(etype=etype)
-            logger.debug(f"Preparing {len(from_nodes)} '{e_col}' DGL edges")
-            for dgl_edge_id, (from_node, to_node) in enumerate(
-                zip(from_nodes, to_nodes)
-            ):
+            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
+            for index, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
                 adb_edge = {
-                    "_key": str(dgl_edge_id),
-                    "_from": f"{from_col}/{str(from_node.item())}",
-                    "_to": f"{to_col}/{str(to_node.item())}",
+                    "_key": str(index),
+                    "_from": f"{from_col}/{str(from_n.item())}",
+                    "_to": f"{to_col}/{str(to_n.item())}",
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
                     features,
-                    dgl_edge_id,
+                    index,
                     adb_edge,
                     e_col,
                     has_one_ecol,
                     canonical_etype,
                 )
 
-                self.__insert_adb_docs(e_col, e_col_docs, adb_edge, batch_size)
+                e_col_docs.append(adb_edge)
 
-        for col, doc_list in adb_documents.items():  # insert remaining documents
-            if doc_list:
-                logger.debug(f"Inserting last {len(doc_list)} documents into '{col}'")
-                self.__db.collection(col).import_bulk(doc_list, on_duplicate="replace")
+        for col, doc_list in adb_documents.items():  # import documents into ArangoDB
+            logger.debug(f"Inserting {len(doc_list)} documents into '{col}'")
+            result = self.__db.collection(col).import_bulk(doc_list, **import_options)
+            logger.debug(result)
 
         logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
@@ -449,32 +442,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for key in features:
             tensor = data[key] if has_one_col else data[key][canonical_etype or col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
-
-    def __insert_adb_docs(
-        self,
-        col: str,
-        col_docs: List[Json],
-        doc: Json,
-        batch_size: int,
-    ) -> None:
-        """Insert an ArangoDB document into a list. If the list exceeds
-        batch_size documents, insert into the ArangoDB collection.
-
-        :param col: The collection name
-        :type col: str
-        :param col_docs: The existing documents data belonging to the collection.
-        :type col_docs: List[adbdgl_adapter.typings.Json]
-        :param doc: The current document to insert.
-        :type doc: adbdgl_adapter.typings.Json
-        :param batch_size: The maximum number of documents to insert at once
-        :type batch_size: int
-        """
-        col_docs.append(doc)
-
-        if len(col_docs) >= batch_size:
-            logger.debug(f"Inserting next {batch_size} batch documents into '{col}'")
-            self.__db.collection(col).import_bulk(col_docs, on_duplicate="replace")
-            col_docs.clear()
 
     def __fetch_adb_docs(
         self, col: str, attributes: Set[str], query_options: Any
