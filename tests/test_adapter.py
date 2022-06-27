@@ -131,6 +131,13 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
             "Hypercube",
             get_hypercube_graph(),
             False,
+            {"batch_size": 1000, "on_duplicate": "replace"},
+        ),
+        (
+            adbdgl_adapter,
+            "Hypercube",
+            get_hypercube_graph(),
+            False,
             {"overwrite": True},
         ),
         (adbdgl_adapter, "Karate", get_karate_graph(), False, {"overwrite": True}),
