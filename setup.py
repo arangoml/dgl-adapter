@@ -20,7 +20,7 @@ setup(
         "requests>=2.27.1",
         "dgl>=0.6.1",
         "torch>=1.10.2",
-        "python-arango>=7.4.0",
+        "python-arango>=7.4.1",
         "setuptools>=45",
     ],
     extras_require={
