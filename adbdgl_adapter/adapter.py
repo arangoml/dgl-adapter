@@ -78,7 +78,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             to DGL, along with their associated attributes to keep.
         :type metagraph: adbdgl_adapter.typings.ArangoMetagraph
         :param query_options: Keyword arguments to specify AQL query options when
-            fetching documents from the ArangoDB instance.
+            fetching documents from the ArangoDB instance. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
         :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
@@ -181,8 +182,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type v_cols: Set[str]
         :param e_cols: A set of ArangoDB edge collections to import to DGL.
         :type e_cols: Set[str]
-        :param query_options: Keyword arguments to specify AQL query options
-            when fetching documents from the ArangoDB instance.
+        :param query_options: Keyword arguments to specify AQL query options when
+            fetching documents from the ArangoDB instance. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
         :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
@@ -199,8 +201,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         :param name: The ArangoDB graph name.
         :type name: str
-        :param query_options: Keyword arguments to specify AQL query options
-            when fetching documents from the ArangoDB instance.
+        :param query_options: Keyword arguments to specify AQL query options when
+            fetching documents from the ArangoDB instance. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
         :type query_options: Any
         :return: A DGL Heterograph
         :rtype: dgl.heterograph.DGLHeteroGraph
@@ -228,8 +231,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             Does not drop associated collections.
         :type overwrite_graph: bool
         :param import_options: Keyword arguments to specify additional
-            parameters for ArangoDB document insertion. See
-            arango.collection.Collection.import_bulk for all options.
+            parameters for ArangoDB document insertion. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
         :type import_options: Any
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
