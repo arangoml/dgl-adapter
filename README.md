@@ -16,7 +16,7 @@
 <a href="https://www.arangodb.com/" rel="arangodb.com">![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/adb_logo.png)</a>
 <a href="https://www.dgl.ai/" rel="dgl.ai"><img src="https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/dgl_logo.png" width=40% /></a>
 
-The ArangoDB-DGL Adapter exports Graphs from ArangoDB, a multi-model Graph Database, into Deep Graph Library (DGL), a python package for graph neural networks, and vice-versa.
+The ArangoDB-DGL Adapter exports Graphs from ArangoDB, the multi-model database for graph & beyond, into Deep Graph Library (DGL), a python package for graph neural networks, and vice-versa.
 
 
 ## About DGL
@@ -45,33 +45,25 @@ pip install git+https://github.com/arangoml/dgl-adapter.git
 Also available as an ArangoDB Lunch & Learn session: [Graph & Beyond Course #2.8](https://www.arangodb.com/resources/lunch-sessions/graph-beyond-lunch-break-2-8-dgl-adapter/)
 
 ```py
-# Import the ArangoDB-DGL Adapter
-from adbdgl_adapter import ADBDGL_Adapter
+from arango import ArangoClient  # Python-Arango driver
+from dgl.data import KarateClubDataset # Sample graph from DGL
 
-# Import the Python-Arango driver
-from arango import ArangoClient
+# Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint
+db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="")
 
-# Import a sample graph from DGL
-from dgl.data import KarateClubDataset
-
-# Instantiate driver client based on user preference
-# Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint for example purposes
-db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="openSesame")
-
-# Instantiate the ADBDGL Adapter with driver client
 adbdgl_adapter = ADBDGL_Adapter(db)
 
-# Convert ArangoDB to DGL via Graph Name
+# Use Case 1.1: ArangoDB to DGL via Graph name
 dgl_fraud_graph = adbdgl_adapter.arangodb_graph_to_dgl("fraud-detection")
 
-# Convert ArangoDB to DGL via Collection Names
+# Use Case 1.2: ArangoDB to DGL via Collection names
 dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
     "fraud-detection",
-    {"account", "Class", "customer"},  # Specify vertex collections
-    {"accountHolder", "Relationship", "transaction"},  # Specify edge collections
+    {"account", "Class", "customer"},  # Vertex collections
+    {"accountHolder", "Relationship", "transaction"},  # Edge collections
 )
 
-# Convert ArangoDB to DGL via a Metagraph
+# Use Case 1.3: ArangoDB to DGL via Metagraph
 metagraph = {
     "vertexCollections": {
         "account": {"Balance", "account_type", "customer_id", "rank"},
@@ -84,7 +76,7 @@ metagraph = {
 }
 dgl_fraud_graph_3 = adbdgl_adapter.arangodb_to_dgl("fraud-detection", metagraph)
 
-# Convert DGL to ArangoDB
+# Use Case 2: DGL to ArangoDB
 dgl_karate_graph = KarateClubDataset()[0]
 adb_karate_graph = adbdgl_adapter.dgl_to_arangodb("Karate", dgl_karate_graph)
 ```

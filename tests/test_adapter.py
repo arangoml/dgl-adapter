@@ -21,12 +21,6 @@ from .conftest import (
 )
 
 
-def test_validate_attributes() -> None:
-    with pytest.raises(ValueError):
-        bad_metagraph: Dict[str, Any] = dict()
-        adbdgl_adapter.arangodb_to_dgl("graph_name", bad_metagraph)
-
-
 def test_validate_constructor() -> None:
     bad_db: Dict[str, Any] = dict()
 
@@ -122,22 +116,42 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "adapter, name, dgl_g, batch_size",
+    "adapter, name, dgl_g, overwrite_graph, import_options",
     [
-        (adbdgl_adapter, "Clique", get_clique_graph(), 3),
-        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), 1000),
-        (adbdgl_adapter, "Hypercube", get_hypercube_graph(), 1000),
-        (adbdgl_adapter, "Karate", get_karate_graph(), 1000),
-        (adbdgl_adapter, "Social", get_social_graph(), 1000),
+        (
+            adbdgl_adapter,
+            "Clique",
+            get_clique_graph(),
+            False,
+            {"batch_size": 3, "on_duplicate": "replace"},
+        ),
+        (adbdgl_adapter, "Lollipop", get_lollipop_graph(), False, {"overwrite": True}),
+        (
+            adbdgl_adapter,
+            "Hypercube",
+            get_hypercube_graph(),
+            False,
+            {"batch_size": 1000, "on_duplicate": "replace"},
+        ),
+        (
+            adbdgl_adapter,
+            "Hypercube",
+            get_hypercube_graph(),
+            False,
+            {"overwrite": True},
+        ),
+        (adbdgl_adapter, "Karate", get_karate_graph(), False, {"overwrite": True}),
+        (adbdgl_adapter, "Social", get_social_graph(), True, {"overwrite": True}),
     ],
 )
 def test_dgl_to_adb(
     adapter: ADBDGL_Adapter,
     name: str,
     dgl_g: Union[DGLGraph, DGLHeteroGraph],
-    batch_size: int,
+    overwrite_graph: bool,
+    import_options: Any,
 ) -> None:
-    adb_g = adapter.dgl_to_arangodb(name, dgl_g, batch_size)
+    adb_g = adapter.dgl_to_arangodb(name, dgl_g, overwrite_graph, **import_options)
     assert_arangodb_data(name, dgl_g, adb_g)
 
 
