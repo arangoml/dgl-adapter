@@ -1,3 +1,62 @@
+## 2.1.0 (2022-06-29)
+
+### New
+
+* Adjust DGL to ArangoDB for increased accessibility to python-arango interface (#24) [Anthony Mahanna]
+
+  * #23: initial commit
+
+  * Update build.yml
+
+  * Update README.md
+
+  * remove: unecessary dict merge using Kwargs
+
+  The DGL HeteroNodeDataView / HeteroEdgeDataView is able to track previously inserted features, so this is not needed
+
+  * remove: setuptools_scm from setup.py
+
+  deprecated in favor of pyproject.toml usage
+
+  * Update README.md
+
+  * remove: __validate_attributes()
+
+  Uncessary noise as we already have proper docstring examples
+
+  * pragma: no cover
+
+  * fix: black
+
+  * chg: #24 (after redefining scope)
+
+  * new: CodeQL Action v2
+
+  * drop python 3.6 support
+
+  mirrors https://github.com/arangoml/networkx-adapter/pull/81/commits/5930c804b03a6f5322b930a498dd68d3c5a743c9
+
+  * Update adapter.py
+
+  * fix: increase coverage
+
+  * prep for 2.1.0 release: documentation tweaks
+
+  * bump: python-arango version
+
+### Fix
+
+* Readme typo. [aMahanna]
+
+### Other
+
+* Update README.md. [aMahanna]
+
+* Changelog: release 2.0.1 (#22) [github-actions[bot]]
+
+  !gitchangelog
+
+
 ## 2.0.1 (2022-05-31)
 
 ### Fix
