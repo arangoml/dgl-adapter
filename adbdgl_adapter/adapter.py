@@ -118,11 +118,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             for i, adb_v in enumerate(
                 self.__fetch_adb_docs(v_col, atribs, query_options)
             ):
-                adb_map[adb_v["_id"]] = {
-                    "id": i,
-                    "col": v_col,
-                }
+                adb_id = adb_v["_id"]
+                logger.debug(f"V{i}: {adb_id}")
 
+                adb_map[adb_id] = {"id": i, "col": v_col}
                 self.__prepare_dgl_features(ndata, atribs, adb_v, v_col)
 
         adb_e: Json
@@ -132,7 +131,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             logger.debug(f"Preparing '{e_col}' edges")
             from_nodes: List[int] = []
             to_nodes: List[int] = []
-            for adb_e in self.__fetch_adb_docs(e_col, atribs, query_options):
+            for i, adb_e in enumerate(
+                self.__fetch_adb_docs(e_col, atribs, query_options)
+            ):
+                logger.debug(f'E{i}: {adb_e["_id"]}')
+
                 from_node = adb_map[adb_e["_from"]]
                 to_node = adb_map[adb_e["_to"]]
 
@@ -267,14 +270,17 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
 
         for v_col in adb_v_cols:
-            v_col_docs = adb_documents[v_col]
             ntype = None if is_default else v_col
+            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
+
+            v_col_docs = adb_documents[v_col]
             features = dgl_g.node_attr_schemes(ntype).keys()
 
             node: Tensor
-            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
-            for node in dgl_g.nodes(ntype):
+            for i, node in enumerate(dgl_g.nodes(ntype)):
                 dgl_node_id = node.item()
+                logger.debug(f"N{i}: {dgl_node_id}")
+
                 adb_vertex = {"_key": str(dgl_node_id)}
                 self.__prepare_adb_attributes(
                     dgl_g.ndata,
@@ -292,8 +298,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         from_n: Tensor
         to_n: Tensor
         for e_col in adb_e_cols:
-            e_col_docs = adb_documents[e_col]
             etype = None if is_default else e_col
+            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
+
+            e_col_docs = adb_documents[e_col]
             features = dgl_g.edge_attr_schemes(etype).keys()
 
             canonical_etype = None
@@ -303,17 +311,18 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 canonical_etype = dgl_g.to_canonical_etype(e_col)
                 from_col, _, to_col = canonical_etype
 
-            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
-            for index, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
+            for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
+                logger.debug(f"E{i}: ({from_n}, {to_n})")
+
                 adb_edge = {
-                    "_key": str(index),
+                    "_key": str(i),
                     "_from": f"{from_col}/{str(from_n.item())}",
                     "_to": f"{to_col}/{str(to_n.item())}",
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
                     features,
-                    index,
+                    i,
                     adb_edge,
                     e_col,
                     has_one_ecol,
