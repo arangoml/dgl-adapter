@@ -48,6 +48,8 @@ Also available as an ArangoDB Lunch & Learn session: [Graph & Beyond Course #2.8
 from arango import ArangoClient  # Python-Arango driver
 from dgl.data import KarateClubDataset # Sample graph from DGL
 
+from adbdgl_adapter import ADBDGL_Adapter
+
 # Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint
 db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="")
 
