@@ -102,10 +102,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             },
         }
         """
-        logger.debug(f"Starting arangodb_to_dgl({name}, ...):")
+        logger.debug(f"--arangodb_to_dgl('{name}')--")
 
         # Maps ArangoDB vertex IDs to DGL node IDs
-        adb_map: Dict[str, Dict[str, Any]] = dict()
+        adb_map: Dict[str, Json] = dict()
 
         # Dictionaries for constructing a heterogeneous graph.
         data_dict: DGLDataDict = dict()
@@ -240,7 +240,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
-        logger.debug(f"Starting dgl_to_arangodb({name}, ...):")
+        logger.debug(f"--dgl_to_arangodb('{name}')--")
 
         is_default = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
         logger.debug(f"Is graph '{name}' using default canonical_etypes? {is_default}")
@@ -267,6 +267,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
+        # Stores to-be-inserted ArangoDB documents by collection name
         adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
 
         for v_col in adb_v_cols:
