@@ -120,7 +120,7 @@ def get_social_graph() -> DGLGraph:
     dgl_g = heterograph(
         {
             ("user", "follows", "user"): (tensor([0, 1]), tensor([1, 2])),
-            ("user", "likes", "game"): (tensor([0, 1, 2]), tensor([0, 1, 2])),
+            ("user", "wants", "game"): (tensor([0, 1, 2]), tensor([0, 1, 2])),
             ("user", "plays", "game"): (tensor([1, 3]), tensor([1, 2])),
         }
     )
