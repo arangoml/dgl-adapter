@@ -55,6 +55,9 @@ class Abstract_ADBDGL_Adapter(ABC):
     def __fetch_adb_docs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
+    def __insert_adb_docs(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
     @property
     def DEFAULT_CANONICAL_ETYPE(self) -> List[DGLCanonicalEType]:
         return [("_N", "_E", "_N")]

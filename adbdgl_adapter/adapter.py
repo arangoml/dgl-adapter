@@ -127,10 +127,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_e: Json
         from_col: Set[str] = set()
         to_col: Set[str] = set()
+        from_nodes: List[int] = []
+        to_nodes: List[int] = []
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
-            from_nodes: List[int] = []
-            to_nodes: List[int] = []
             for i, adb_e in enumerate(
                 self.__fetch_adb_docs(e_col, atribs, query_options)
             ):
@@ -157,6 +157,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 tensor(from_nodes),
                 tensor(to_nodes),
             )
+            from_nodes.clear()
+            to_nodes.clear()
 
         dgl_g: DGLHeteroGraph = heterograph(data_dict)
         has_one_ntype = len(dgl_g.ntypes) == 1
@@ -267,15 +269,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
-        # Stores to-be-inserted ArangoDB documents by collection name
-        adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
-
+        v_col_docs: List[Json] = []  # # to-be-inserted ArangoDB vertices
         for v_col in adb_v_cols:
             ntype = None if is_default else v_col
-            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
-
-            v_col_docs = adb_documents[v_col]
             features = dgl_g.node_attr_schemes(ntype).keys()
+            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
 
             node: Tensor
             for i, node in enumerate(dgl_g.nodes(ntype)):
@@ -294,16 +292,18 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
                 v_col_docs.append(adb_vertex)
 
+            self.__insert_adb_docs(v_col, v_col_docs, import_options)
+            v_col_docs.clear()
+
         from_col: str
         to_col: str
         from_n: Tensor
         to_n: Tensor
+        e_col_docs: List[Json] = []  # # to-be-inserted ArangoDB vertices
         for e_col in adb_e_cols:
             etype = None if is_default else e_col
-            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
-
-            e_col_docs = adb_documents[e_col]
             features = dgl_g.edge_attr_schemes(etype).keys()
+            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
 
             canonical_etype = None
             if is_default:
@@ -332,10 +332,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
                 e_col_docs.append(adb_edge)
 
-        for col, doc_list in adb_documents.items():  # import documents into ArangoDB
-            logger.debug(f"Inserting {len(doc_list)} documents into '{col}'")
-            result = self.__db.collection(col).import_bulk(doc_list, **import_options)
-            logger.debug(result)
+            self.__insert_adb_docs(e_col, e_col_docs, import_options)
+            e_col_docs.clear()
 
         logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
@@ -481,3 +479,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """
 
         return self.__db.aql.execute(aql, **query_options)
+
+    def __insert_adb_docs(
+        self, col: str, docs: List[Json], import_options: Any
+    ) -> None:
+        """Insert ArangoDB documents into their ArangoDB collection.
+
+        :param col: The ArangoDB collection name
+        :type col: str
+        :param docs: To-be-inserted ArangoDB documents
+        :type docs: List[Json]
+        :param import_options: Keyword arguments to specify additional
+            parameters for ArangoDB document insertion. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
+        """
+        logger.debug(f"Inserting {len(docs)} documents into '{col}'")
+        result = self.__db.collection(col).import_bulk(docs, **import_options)
+        logger.debug(result)
