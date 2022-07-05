@@ -115,9 +115,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         adb_v: Json
         for v_col, atribs in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
-            for i, adb_v in enumerate(
-                self.__fetch_adb_docs(v_col, query_options)
-            ):
+            for i, adb_v in enumerate(self.__fetch_adb_docs(v_col, query_options)):
                 adb_id = adb_v["_id"]
                 logger.debug(f"V{i}: {adb_id}")
 
@@ -131,9 +129,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         to_nodes: List[int] = []
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
-            for i, adb_e in enumerate(
-                self.__fetch_adb_docs(e_col, query_options)
-            ):
+            for i, adb_e in enumerate(self.__fetch_adb_docs(e_col, query_options)):
                 logger.debug(f'E{i}: {adb_e["_id"]}')
 
                 from_node = adb_map[adb_e["_from"]]
@@ -262,14 +258,16 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         else:
             adb_graph = self.__db.create_graph(name, edge_definitions)
 
-        adb_v_cols = adb_graph.vertex_collections()
-        adb_e_cols = [e_d["edge_collection"] for e_d in adb_graph.edge_definitions()]
+        adb_v_cols: List[str] = adb_graph.vertex_collections()
+        adb_e_cols: List[str] = [
+            e_d["edge_collection"] for e_d in adb_graph.edge_definitions()
+        ]
 
         has_one_vcol = len(adb_v_cols) == 1
         has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
-        v_col_docs: List[Json] = []  # # to-be-inserted ArangoDB vertices
+        v_col_docs: List[Json] = []  # to-be-inserted ArangoDB vertices
         for v_col in adb_v_cols:
             ntype = None if is_default else v_col
             features = dgl_g.node_attr_schemes(ntype).keys()
@@ -295,11 +293,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             self.__insert_adb_docs(v_col, v_col_docs, import_options)
             v_col_docs.clear()
 
-        from_col: str
-        to_col: str
-        from_n: Tensor
-        to_n: Tensor
-        e_col_docs: List[Json] = []  # # to-be-inserted ArangoDB vertices
+        e_col_docs: List[Json] = []  # to-be-inserted ArangoDB edges
         for e_col in adb_e_cols:
             etype = None if is_default else e_col
             features = dgl_g.edge_attr_schemes(etype).keys()
@@ -309,14 +303,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             if is_default:
                 from_col = to_col = adb_v_cols[0]
             else:
-                canonical_etype = dgl_g.to_canonical_etype(e_col)
+                canonical_etype: DGLCanonicalEType = dgl_g.to_canonical_etype(e_col)
                 from_col, _, to_col = canonical_etype
 
             for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
                 logger.debug(f"E{i}: ({from_n}, {to_n})")
 
                 adb_edge = {
-                    "_key": str(i),
                     "_from": f"{from_col}/{str(from_n.item())}",
                     "_to": f"{to_col}/{str(to_n.item())}",
                 }
@@ -360,13 +353,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             }
         ]
         """
+
+        edge_type_map = defaultdict(lambda: defaultdict(set))
+        for edge_type in canonical_etypes:
+            from_col, e_col, to_col = edge_type
+            edge_type_map[e_col]["from"].add(from_col)
+            edge_type_map[e_col]["to"].add(to_col)
+
         edge_definitions: List[Json] = []
-        for dgl_from, dgl_e, dgl_to in canonical_etypes:
+        for e_col, v_cols in edge_type_map.items():
             edge_definitions.append(
                 {
-                    "from_vertex_collections": [dgl_from],
-                    "edge_collection": dgl_e,
-                    "to_vertex_collections": [dgl_to],
+                    "from_vertex_collections": list(v_cols["from"]),
+                    "edge_collection": e_col,
+                    "to_vertex_collections": list(v_cols["to"]),
                 }
             )
 
@@ -454,9 +454,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             tensor = data[key] if has_one_col else data[key][canonical_etype or col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
-    def __fetch_adb_docs(
-        self, col: str, query_options: Any
-    ) -> Result[Cursor]:
+    def __fetch_adb_docs(self, col: str, query_options: Any) -> Result[Cursor]:
         """Fetches ArangoDB documents within a collection.
 
         :param col: The ArangoDB collection.
