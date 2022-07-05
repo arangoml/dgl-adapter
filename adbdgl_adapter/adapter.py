@@ -293,6 +293,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             self.__insert_adb_docs(v_col, v_col_docs, import_options)
             v_col_docs.clear()
 
+        from_col: str
+        to_col: str
         e_col_docs: List[Json] = []  # to-be-inserted ArangoDB edges
         for e_col in adb_e_cols:
             etype = None if is_default else e_col
@@ -303,7 +305,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             if is_default:
                 from_col = to_col = adb_v_cols[0]
             else:
-                canonical_etype: DGLCanonicalEType = dgl_g.to_canonical_etype(e_col)
+                canonical_etype = dgl_g.to_canonical_etype(e_col)
                 from_col, _, to_col = canonical_etype
 
             for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
@@ -354,7 +356,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         ]
         """
 
-        edge_type_map = defaultdict(lambda: defaultdict(set))
+        edge_type_map: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(set))
         for edge_type in canonical_etypes:
             from_col, e_col, to_col = edge_type
             edge_type_map[e_col]["from"].add(from_col)
