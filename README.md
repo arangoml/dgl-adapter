@@ -68,12 +68,14 @@ dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
 # Use Case 1.3: ArangoDB to DGL via Metagraph
 metagraph = {
     "vertexCollections": {
-        "account": {"Balance", "account_type", "customer_id", "rank"},
-        "customer": {"Name", "rank"},
+        "account": {"Balance", "rank"},
+        "customer": {"rank"},
+        "Class": {},
     },
     "edgeCollections": {
         "transaction": {"transaction_amt", "sender_bank_id", "receiver_bank_id"},
         "accountHolder": {},
+        "Relationship": {},
     },
 }
 dgl_fraud_graph_3 = adbdgl_adapter.arangodb_to_dgl("fraud-detection", metagraph)

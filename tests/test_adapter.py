@@ -42,18 +42,14 @@ def test_validate_constructor() -> None:
             "fraud-detection",
             {
                 "vertexCollections": {
-                    "account": {"rank"},
+                    "account": {"Balance", "rank"},
+                    "customer": {"rank"},
                     "Class": {},
-                    "customer": {"Sex", "Ssn", "rank"},
                 },
                 "edgeCollections": {
+                    "transaction": {"transaction_amt", "sender_bank_id", "receiver_bank_id"},
                     "accountHolder": {},
-                    "Relationship": {
-                        "label",
-                        "name",
-                        "relationshipType",
-                    },
-                    "transaction": {},
+                    "Relationship": {},
                 },
             },
         ),
@@ -64,6 +60,7 @@ def test_adb_to_dgl(
 ) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
     assert_dgl_data(adapter.db, dgl_g, metagraph)
+    print(dgl_g.edata)
 
 
 @pytest.mark.parametrize(
