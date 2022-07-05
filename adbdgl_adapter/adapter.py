@@ -123,38 +123,30 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 self.__prepare_dgl_features(ndata, atribs, adb_v, v_col)
 
         adb_e: Json
-        from_col: Set[str] = set()
-        to_col: Set[str] = set()
-        from_nodes: List[int] = []
-        to_nodes: List[int] = []
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
+
+            edge_dict: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
+
             for i, adb_e in enumerate(self.__fetch_adb_docs(e_col, query_options)):
                 logger.debug(f'E{i}: {adb_e["_id"]}')
 
                 from_node = adb_map[adb_e["_from"]]
                 to_node = adb_map[adb_e["_to"]]
+                edge_type = (from_node["col"], e_col, to_node["col"])
 
-                from_col.add(from_node["col"])
-                to_col.add(to_node["col"])
-                if len(from_col | to_col) > 2:
-                    raise ValueError(  # pragma: no cover
-                        f"""Can't convert to DGL:
-                            too many '_from' & '_to' collections in {e_col}
-                        """
-                    )
+                edge_data = edge_dict[edge_type]
+                edge_data["from_nodes"].append(from_node["id"])
+                edge_data["to_nodes"].append(to_node["id"])
 
-                from_nodes.append(from_node["id"])
-                to_nodes.append(to_node["id"])
+                self.__prepare_dgl_features(edata, atribs, adb_e, edge_type)
 
-                self.__prepare_dgl_features(edata, atribs, adb_e, e_col)
-
-            data_dict[(from_col.pop(), e_col, to_col.pop())] = (
-                tensor(from_nodes),
-                tensor(to_nodes),
-            )
-            from_nodes.clear()
-            to_nodes.clear()
+            for edge_type, edges in edge_dict.items():
+                logger.debug(f"Inserting {edge_type} edges")
+                data_dict[edge_type] = (
+                    tensor(edges["from_nodes"]),
+                    tensor(edges["to_nodes"]),
+                )
 
         dgl_g: DGLHeteroGraph = heterograph(data_dict)
         has_one_ntype = len(dgl_g.ntypes) == 1
@@ -379,7 +371,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         features_data: DefaultDict[Any, Any],
         attributes: Set[str],
         doc: Json,
-        col: str,
+        col: Union[str, DGLCanonicalEType],
     ) -> None:
         """Convert a set of ArangoDB attributes into valid DGL features
 
@@ -389,8 +381,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type attributes: Set[str]
         :param doc: The current ArangoDB document
         :type doc: adbdgl_adapter.typings.Json
-        :param col: The collection the current document belongs to
-        :type col: str
+        :param col: The collection the current document belongs to. For edge
+            collections, the entire DGL Canonical eType is specified (src, e, dst)
+        :type col: str | Tuple[str, str, str]
         """
         key: str
         for key in attributes:
