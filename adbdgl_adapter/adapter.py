@@ -116,7 +116,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for v_col, atribs in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
             for i, adb_v in enumerate(
-                self.__fetch_adb_docs(v_col, atribs, query_options)
+                self.__fetch_adb_docs(v_col, query_options)
             ):
                 adb_id = adb_v["_id"]
                 logger.debug(f"V{i}: {adb_id}")
@@ -132,7 +132,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
             for i, adb_e in enumerate(
-                self.__fetch_adb_docs(e_col, atribs, query_options)
+                self.__fetch_adb_docs(e_col, query_options)
             ):
                 logger.debug(f'E{i}: {adb_e["_id"]}')
 
@@ -455,14 +455,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
     def __fetch_adb_docs(
-        self, col: str, attributes: Set[str], query_options: Any
+        self, col: str, query_options: Any
     ) -> Result[Cursor]:
         """Fetches ArangoDB documents within a collection.
 
         :param col: The ArangoDB collection.
         :type col: str
-        :param attributes: The set of document attributes.
-        :type attributes: Set[str]
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
         :type query_options: Any
@@ -471,11 +469,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """
         aql = f"""
             FOR doc IN {col}
-                RETURN MERGE(
-                    KEEP(doc, {list(attributes)}),
-                    {{"_id": doc._id}},
-                    doc._from ? {{"_from": doc._from, "_to": doc._to}}: {{}}
-                )
+                RETURN doc
         """
 
         return self.__db.aql.execute(aql, **query_options)
