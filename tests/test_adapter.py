@@ -47,7 +47,11 @@ def test_validate_constructor() -> None:
                     "Class": {},
                 },
                 "edgeCollections": {
-                    "transaction": {"transaction_amt", "sender_bank_id", "receiver_bank_id"},
+                    "transaction": {
+                        "transaction_amt",
+                        "sender_bank_id",
+                        "receiver_bank_id",
+                    },
                     "accountHolder": {},
                     "Relationship": {},
                 },
