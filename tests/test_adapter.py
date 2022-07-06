@@ -142,7 +142,7 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
             {"overwrite": True},
         ),
         (adbdgl_adapter, "Karate", get_karate_graph(), False, {"overwrite": True}),
-        (adbdgl_adapter, "Social", get_social_graph(), True, {"overwrite": True}),
+        (adbdgl_adapter, "Social", get_social_graph(), True, {"on_duplicate": "replace"}),
     ],
 )
 def test_dgl_to_adb(
@@ -195,35 +195,31 @@ def assert_arangodb_data(
 ) -> None:
     is_default_type = dgl_g.canonical_etypes == adbdgl_adapter.DEFAULT_CANONICAL_ETYPE
 
-    for dgl_v_col in dgl_g.ntypes:
-        adb_v_col = name + dgl_v_col if is_default_type else dgl_v_col
-        attributes = dgl_g.node_attr_schemes(
-            None if is_default_type else dgl_v_col
-        ).keys()
+    node: Tensor
+    for ntype in dgl_g.ntypes:
+        adb_v_col = f"{name}_N" if is_default_type else ntype
+        attributes = dgl_g.node_attr_schemes(ntype).keys()
         col = adb_g.vertex_collection(adb_v_col)
 
-        node: Tensor
-        for node in dgl_g.nodes(dgl_v_col):
+        for node in dgl_g.nodes(ntype):
             vertex = col.get(str(node.item()))
             assert vertex
             for atrib in attributes:
                 assert atrib in vertex
 
-    for dgl_e_col in dgl_g.etypes:
-        dgl_from_col, _, dgl_to_col = dgl_g.to_canonical_etype(dgl_e_col)
-        attributes = dgl_g.edge_attr_schemes(
-            None if is_default_type else dgl_e_col
-        ).keys()
+    from_node: Tensor
+    to_node: Tensor
+    for c_etype in dgl_g.canonical_etypes:
+        dgl_from_col, dgl_e_col, dgl_to_col = c_etype
+        attributes = dgl_g.edge_attr_schemes(c_etype).keys()
 
-        adb_e_col = name + dgl_e_col if is_default_type else dgl_e_col
-        adb_from_col = name + dgl_v_col if is_default_type else dgl_from_col
-        adb_to_col = name + dgl_v_col if is_default_type else dgl_to_col
+        adb_e_col = f"{name}_E" if is_default_type else dgl_e_col
+        adb_from_col = f"{name}_N" if is_default_type else dgl_from_col
+        adb_to_col = f"{name}_N" if is_default_type else dgl_to_col
 
         col = adb_g.edge_collection(adb_e_col)
 
-        from_node: Tensor
-        to_node: Tensor
-        from_nodes, to_nodes = dgl_g.edges(etype=dgl_e_col)
+        from_nodes, to_nodes = dgl_g.edges(etype=c_etype)
         for from_node, to_node in zip(from_nodes, to_nodes):
             edge = col.find(
                 {

@@ -109,8 +109,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         # Dictionaries for constructing a heterogeneous graph.
         data_dict: DGLDataDict = dict()
-        ndata: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
-        edata: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
+
+        ndata: DefaultDict[str, DefaultDict[str, List[Any]]]
+        ndata = defaultdict(lambda: defaultdict(list))
+
+        edata: DefaultDict[str, DefaultDict[str, List[Any]]]
+        edata = defaultdict(lambda: defaultdict(list))
 
         adb_v: Json
         for v_col, atribs in metagraph["vertexCollections"].items():
@@ -123,10 +127,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 self.__prepare_dgl_features(ndata, atribs, adb_v, v_col)
 
         adb_e: Json
+        edge_dict: DefaultDict[DGLCanonicalEType, DefaultDict[str, List[Any]]]
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
 
-            edge_dict: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
+            edge_dict = defaultdict(lambda: defaultdict(list))
 
             for i, adb_e in enumerate(self.__fetch_adb_docs(e_col, query_options)):
                 logger.debug(f'E{i}: {adb_e["_id"]}')
@@ -250,22 +255,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         else:
             adb_graph = self.__db.create_graph(name, edge_definitions)
 
-        adb_v_cols: List[str] = adb_graph.vertex_collections()
-        adb_e_cols: List[str] = [
-            e_d["edge_collection"] for e_d in adb_graph.edge_definitions()
-        ]
+        adb_v_cols = adb_graph.vertex_collections()
 
         has_one_vcol = len(adb_v_cols) == 1
         has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
+        node: Tensor
         v_col_docs: List[Json] = []  # to-be-inserted ArangoDB vertices
-        for v_col in adb_v_cols:
-            ntype = None if is_default else v_col
-            features = dgl_g.node_attr_schemes(ntype).keys()
+        for ntype in dgl_g.ntypes:
+            v_col = adb_v_cols[0] if is_default else ntype
             logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
 
-            node: Tensor
+            features = dgl_g.node_attr_schemes(ntype).keys()
+
             for i, node in enumerate(dgl_g.nodes(ntype)):
                 dgl_node_id = node.item()
                 logger.debug(f"N{i}: {dgl_node_id}")
@@ -285,22 +288,21 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             self.__insert_adb_docs(v_col, v_col_docs, import_options)
             v_col_docs.clear()
 
-        from_col: str
-        to_col: str
+        from_n: Tensor
+        to_n: Tensor
         e_col_docs: List[Json] = []  # to-be-inserted ArangoDB edges
-        for e_col in adb_e_cols:
-            etype = None if is_default else e_col
-            features = dgl_g.edge_attr_schemes(etype).keys()
-            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
+        for c_etype in dgl_g.canonical_etypes:
+            logger.debug(f"Preparing {dgl_g.number_of_edges(c_etype)} {c_etype} edges")
 
-            canonical_etype = None
+            features = dgl_g.edge_attr_schemes(c_etype).keys()
+
             if is_default:
+                e_col = adb_e_cols[0]
                 from_col = to_col = adb_v_cols[0]
             else:
-                canonical_etype = dgl_g.to_canonical_etype(e_col)
-                from_col, _, to_col = canonical_etype
+                from_col, e_col, to_col = c_etype
 
-            for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
+            for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=c_etype))):
                 logger.debug(f"E{i}: ({from_n}, {to_n})")
 
                 adb_edge = {
@@ -314,7 +316,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     adb_edge,
                     e_col,
                     has_one_ecol,
-                    canonical_etype,
+                    c_etype,
                 )
 
                 e_col_docs.append(adb_edge)
@@ -348,7 +350,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         ]
         """
 
-        edge_type_map: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(set))
+        edge_type_map: DefaultDict[str, DefaultDict[str, Set[str]]]
+        edge_type_map = defaultdict(lambda: defaultdict(set))
         for edge_type in canonical_etypes:
             from_col, e_col, to_col = edge_type
             edge_type_map[e_col]["from"].add(from_col)
