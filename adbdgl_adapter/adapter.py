@@ -256,6 +256,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             adb_graph = self.__db.create_graph(name, edge_definitions)
 
         adb_v_cols = adb_graph.vertex_collections()
+        adb_e_cols = [e_d["edge_collection"] for e_d in adb_graph.edge_definitions()]
 
         has_one_vcol = len(adb_v_cols) == 1
         has_one_ecol = len(adb_e_cols) == 1
