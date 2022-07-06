@@ -142,7 +142,13 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
             {"overwrite": True},
         ),
         (adbdgl_adapter, "Karate", get_karate_graph(), False, {"overwrite": True}),
-        (adbdgl_adapter, "Social", get_social_graph(), True, {"on_duplicate": "replace"}),
+        (
+            adbdgl_adapter,
+            "Social",
+            get_social_graph(),
+            True,
+            {"on_duplicate": "replace"},
+        ),
     ],
 )
 def test_dgl_to_adb(
