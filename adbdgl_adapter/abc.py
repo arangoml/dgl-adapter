@@ -7,7 +7,7 @@ from typing import Any, List, Set, Union
 from arango.graph import Graph as ArangoDBGraph
 from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
-from torch.functional import Tensor
+from torch import Tensor
 
 from .typings import ArangoMetagraph, DGLCanonicalEType, Json
 

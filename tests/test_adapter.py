@@ -5,7 +5,7 @@ from arango.database import StandardDatabase
 from arango.graph import Graph as ArangoGraph
 from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
-from torch.functional import Tensor
+from torch import Tensor
 
 from adbdgl_adapter import ADBDGL_Adapter
 from adbdgl_adapter.typings import ArangoMetagraph
@@ -63,8 +63,7 @@ def test_adb_to_dgl(
     adapter: ADBDGL_Adapter, name: str, metagraph: ArangoMetagraph
 ) -> None:
     dgl_g = adapter.arangodb_to_dgl(name, metagraph)
-    assert_dgl_data(adapter.db, dgl_g, metagraph)
-    print(dgl_g.edata)
+    assert_dgl_data(db, dgl_g, metagraph)
 
 
 @pytest.mark.parametrize(
@@ -87,7 +86,7 @@ def test_adb_collections_to_dgl(
         e_cols,
     )
     assert_dgl_data(
-        adapter.db,
+        db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},
@@ -107,7 +106,7 @@ def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
 
     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
     assert_dgl_data(
-        adapter.db,
+        db,
         dgl_g,
         metagraph={
             "vertexCollections": {col: set() for col in v_cols},

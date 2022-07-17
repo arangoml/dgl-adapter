@@ -10,8 +10,7 @@ from arango.graph import Graph as ADBGraph
 from arango.result import Result
 from dgl import DGLGraph, DGLHeteroGraph, heterograph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
-from torch import tensor
-from torch.functional import Tensor
+from torch import tensor, Tensor
 
 from .abc import Abstract_ADBDGL_Adapter
 from .controller import ADBDGL_Controller

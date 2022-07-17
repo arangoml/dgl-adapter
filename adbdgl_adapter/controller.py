@@ -3,7 +3,7 @@
 
 from typing import Any, Union
 
-from torch.functional import Tensor
+from torch import Tensor
 
 from adbdgl_adapter.typings import DGLCanonicalEType
 
