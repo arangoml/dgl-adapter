@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Any
+from typing import Any, Union
 
-from torch.functional import Tensor
+from torch import Tensor
+
+from adbdgl_adapter.typings import DGLCanonicalEType
 
 from .abc import Abstract_ADBDGL_Controller
 
@@ -18,7 +20,9 @@ class ADBDGL_Controller(Abstract_ADBDGL_Controller):
     consistency between your ArangoDB attributes & your DGL features.
     """
 
-    def _adb_attribute_to_dgl_feature(self, key: str, col: str, val: Any) -> Any:
+    def _adb_attribute_to_dgl_feature(
+        self, key: str, col: Union[str, DGLCanonicalEType], val: Any
+    ) -> Any:
         """
         Given an ArangoDB attribute key, its assigned value (for an arbitrary document),
         and the collection it belongs to, convert it to a valid

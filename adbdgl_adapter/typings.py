@@ -2,7 +2,7 @@ __all__ = ["Json", "ArangoMetagraph", "DGLCanonicalEType"]
 
 from typing import Any, Dict, Set, Tuple
 
-from torch.functional import Tensor
+from torch import Tensor
 
 Json = Dict[str, Any]
 ArangoMetagraph = Dict[str, Dict[str, Set[str]]]

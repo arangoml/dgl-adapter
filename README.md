@@ -48,6 +48,8 @@ Also available as an ArangoDB Lunch & Learn session: [Graph & Beyond Course #2.8
 from arango import ArangoClient  # Python-Arango driver
 from dgl.data import KarateClubDataset # Sample graph from DGL
 
+from adbdgl_adapter import ADBDGL_Adapter
+
 # Let's assume that the ArangoDB "fraud detection" dataset is imported to this endpoint
 db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="")
 
@@ -66,12 +68,14 @@ dgl_fraud_graph_2 = adbdgl_adapter.arangodb_collections_to_dgl(
 # Use Case 1.3: ArangoDB to DGL via Metagraph
 metagraph = {
     "vertexCollections": {
-        "account": {"Balance", "account_type", "customer_id", "rank"},
-        "customer": {"Name", "rank"},
+        "account": {"Balance", "rank"},
+        "customer": {"rank"},
+        "Class": {},
     },
     "edgeCollections": {
         "transaction": {"transaction_amt", "sender_bank_id", "receiver_bank_id"},
         "accountHolder": {},
+        "Relationship": {},
     },
 }
 dgl_fraud_graph_3 = adbdgl_adapter.arangodb_to_dgl("fraud-detection", metagraph)

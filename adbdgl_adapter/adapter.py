@@ -10,8 +10,7 @@ from arango.graph import Graph as ADBGraph
 from arango.result import Result
 from dgl import DGLGraph, DGLHeteroGraph, heterograph
 from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
-from torch import tensor
-from torch.functional import Tensor
+from torch import Tensor, tensor
 
 from .abc import Abstract_ADBDGL_Adapter
 from .controller import ADBDGL_Controller
@@ -102,58 +101,56 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             },
         }
         """
-        logger.debug(f"Starting arangodb_to_dgl({name}, ...):")
+        logger.debug(f"--arangodb_to_dgl('{name}')--")
 
         # Maps ArangoDB vertex IDs to DGL node IDs
-        adb_map: Dict[str, Dict[str, Any]] = dict()
+        adb_map: Dict[str, Json] = dict()
 
         # Dictionaries for constructing a heterogeneous graph.
         data_dict: DGLDataDict = dict()
-        ndata: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
-        edata: DefaultDict[Any, Any] = defaultdict(lambda: defaultdict(list))
+
+        ndata: DefaultDict[str, DefaultDict[str, List[Any]]]
+        ndata = defaultdict(lambda: defaultdict(list))
+
+        edata: DefaultDict[str, DefaultDict[str, List[Any]]]
+        edata = defaultdict(lambda: defaultdict(list))
 
         adb_v: Json
         for v_col, atribs in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
-            for i, adb_v in enumerate(
-                self.__fetch_adb_docs(v_col, atribs, query_options)
-            ):
-                adb_map[adb_v["_id"]] = {
-                    "id": i,
-                    "col": v_col,
-                }
+            for i, adb_v in enumerate(self.__fetch_adb_docs(v_col, query_options)):
+                adb_id = adb_v["_id"]
+                logger.debug(f"V{i}: {adb_id}")
 
+                adb_map[adb_id] = {"id": i, "col": v_col}
                 self.__prepare_dgl_features(ndata, atribs, adb_v, v_col)
 
         adb_e: Json
-        from_col: Set[str] = set()
-        to_col: Set[str] = set()
+        edge_dict: DefaultDict[DGLCanonicalEType, DefaultDict[str, List[Any]]]
         for e_col, atribs in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
-            from_nodes: List[int] = []
-            to_nodes: List[int] = []
-            for adb_e in self.__fetch_adb_docs(e_col, atribs, query_options):
+
+            edge_dict = defaultdict(lambda: defaultdict(list))
+
+            for i, adb_e in enumerate(self.__fetch_adb_docs(e_col, query_options)):
+                logger.debug(f'E{i}: {adb_e["_id"]}')
+
                 from_node = adb_map[adb_e["_from"]]
                 to_node = adb_map[adb_e["_to"]]
+                edge_type = (from_node["col"], e_col, to_node["col"])
 
-                from_col.add(from_node["col"])
-                to_col.add(to_node["col"])
-                if len(from_col | to_col) > 2:
-                    raise ValueError(  # pragma: no cover
-                        f"""Can't convert to DGL:
-                            too many '_from' & '_to' collections in {e_col}
-                        """
-                    )
+                edge_data = edge_dict[edge_type]
+                edge_data["from_nodes"].append(from_node["id"])
+                edge_data["to_nodes"].append(to_node["id"])
 
-                from_nodes.append(from_node["id"])
-                to_nodes.append(to_node["id"])
+                self.__prepare_dgl_features(edata, atribs, adb_e, edge_type)
 
-                self.__prepare_dgl_features(edata, atribs, adb_e, e_col)
-
-            data_dict[(from_col.pop(), e_col, to_col.pop())] = (
-                tensor(from_nodes),
-                tensor(to_nodes),
-            )
+            for edge_type, edges in edge_dict.items():
+                logger.debug(f"Inserting {edge_type} edges")
+                data_dict[edge_type] = (
+                    tensor(edges["from_nodes"]),
+                    tensor(edges["to_nodes"]),
+                )
 
         dgl_g: DGLHeteroGraph = heterograph(data_dict)
         has_one_ntype = len(dgl_g.ntypes) == 1
@@ -237,7 +234,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         """
-        logger.debug(f"Starting dgl_to_arangodb({name}, ...):")
+        logger.debug(f"--dgl_to_arangodb('{name}')--")
 
         is_default = dgl_g.canonical_etypes == self.DEFAULT_CANONICAL_ETYPE
         logger.debug(f"Is graph '{name}' using default canonical_etypes? {is_default}")
@@ -264,17 +261,18 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         has_one_ecol = len(adb_e_cols) == 1
         logger.debug(f"Is graph '{name}' homogenous? {has_one_vcol and has_one_ecol}")
 
-        adb_documents: DefaultDict[str, List[Json]] = defaultdict(list)
+        node: Tensor
+        v_col_docs: List[Json] = []  # to-be-inserted ArangoDB vertices
+        for ntype in dgl_g.ntypes:
+            v_col = adb_v_cols[0] if is_default else ntype
+            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
 
-        for v_col in adb_v_cols:
-            v_col_docs = adb_documents[v_col]
-            ntype = None if is_default else v_col
             features = dgl_g.node_attr_schemes(ntype).keys()
 
-            node: Tensor
-            logger.debug(f"Preparing {dgl_g.number_of_nodes(ntype)} '{v_col}' nodes")
-            for node in dgl_g.nodes(ntype):
+            for i, node in enumerate(dgl_g.nodes(ntype)):
                 dgl_node_id = node.item()
+                logger.debug(f"N{i}: {dgl_node_id}")
+
                 adb_vertex = {"_key": str(dgl_node_id)}
                 self.__prepare_adb_attributes(
                     dgl_g.ndata,
@@ -287,45 +285,44 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
                 v_col_docs.append(adb_vertex)
 
-        from_col: str
-        to_col: str
+            self.__insert_adb_docs(v_col, v_col_docs, import_options)
+            v_col_docs.clear()
+
         from_n: Tensor
         to_n: Tensor
-        for e_col in adb_e_cols:
-            e_col_docs = adb_documents[e_col]
-            etype = None if is_default else e_col
-            features = dgl_g.edge_attr_schemes(etype).keys()
+        e_col_docs: List[Json] = []  # to-be-inserted ArangoDB edges
+        for c_etype in dgl_g.canonical_etypes:
+            logger.debug(f"Preparing {dgl_g.number_of_edges(c_etype)} {c_etype} edges")
 
-            canonical_etype = None
+            features = dgl_g.edge_attr_schemes(c_etype).keys()
+
             if is_default:
+                e_col = adb_e_cols[0]
                 from_col = to_col = adb_v_cols[0]
             else:
-                canonical_etype = dgl_g.to_canonical_etype(e_col)
-                from_col, _, to_col = canonical_etype
+                from_col, e_col, to_col = c_etype
 
-            logger.debug(f"Preparing {dgl_g.number_of_edges(etype)} '{e_col}' edges")
-            for index, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=etype))):
+            for i, (from_n, to_n) in enumerate(zip(*dgl_g.edges(etype=c_etype))):
+                logger.debug(f"E{i}: ({from_n}, {to_n})")
+
                 adb_edge = {
-                    "_key": str(index),
                     "_from": f"{from_col}/{str(from_n.item())}",
                     "_to": f"{to_col}/{str(to_n.item())}",
                 }
                 self.__prepare_adb_attributes(
                     dgl_g.edata,
                     features,
-                    index,
+                    i,
                     adb_edge,
                     e_col,
                     has_one_ecol,
-                    canonical_etype,
+                    c_etype,
                 )
 
                 e_col_docs.append(adb_edge)
 
-        for col, doc_list in adb_documents.items():  # import documents into ArangoDB
-            logger.debug(f"Inserting {len(doc_list)} documents into '{col}'")
-            result = self.__db.collection(col).import_bulk(doc_list, **import_options)
-            logger.debug(result)
+            self.__insert_adb_docs(e_col, e_col_docs, import_options)
+            e_col_docs.clear()
 
         logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
@@ -352,13 +349,21 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             }
         ]
         """
+
+        edge_type_map: DefaultDict[str, DefaultDict[str, Set[str]]]
+        edge_type_map = defaultdict(lambda: defaultdict(set))
+        for edge_type in canonical_etypes:
+            from_col, e_col, to_col = edge_type
+            edge_type_map[e_col]["from"].add(from_col)
+            edge_type_map[e_col]["to"].add(to_col)
+
         edge_definitions: List[Json] = []
-        for dgl_from, dgl_e, dgl_to in canonical_etypes:
+        for e_col, v_cols in edge_type_map.items():
             edge_definitions.append(
                 {
-                    "from_vertex_collections": [dgl_from],
-                    "edge_collection": dgl_e,
-                    "to_vertex_collections": [dgl_to],
+                    "from_vertex_collections": list(v_cols["from"]),
+                    "edge_collection": e_col,
+                    "to_vertex_collections": list(v_cols["to"]),
                 }
             )
 
@@ -369,7 +374,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         features_data: DefaultDict[Any, Any],
         attributes: Set[str],
         doc: Json,
-        col: str,
+        col: Union[str, DGLCanonicalEType],
     ) -> None:
         """Convert a set of ArangoDB attributes into valid DGL features
 
@@ -379,8 +384,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type attributes: Set[str]
         :param doc: The current ArangoDB document
         :type doc: adbdgl_adapter.typings.Json
-        :param col: The collection the current document belongs to
-        :type col: str
+        :param col: The collection the current document belongs to. For edge
+            collections, the entire DGL Canonical eType is specified (src, e, dst)
+        :type col: str | Tuple[str, str, str]
         """
         key: str
         for key in attributes:
@@ -446,15 +452,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             tensor = data[key] if has_one_col else data[key][canonical_etype or col]
             doc[key] = self.__cntrl._dgl_feature_to_adb_attribute(key, col, tensor[id])
 
-    def __fetch_adb_docs(
-        self, col: str, attributes: Set[str], query_options: Any
-    ) -> Result[Cursor]:
+    def __fetch_adb_docs(self, col: str, query_options: Any) -> Result[Cursor]:
         """Fetches ArangoDB documents within a collection.
 
         :param col: The ArangoDB collection.
         :type col: str
-        :param attributes: The set of document attributes.
-        :type attributes: Set[str]
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
         :type query_options: Any
@@ -463,11 +465,24 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """
         aql = f"""
             FOR doc IN {col}
-                RETURN MERGE(
-                    KEEP(doc, {list(attributes)}),
-                    {{"_id": doc._id}},
-                    doc._from ? {{"_from": doc._from, "_to": doc._to}}: {{}}
-                )
+                RETURN doc
         """
 
         return self.__db.aql.execute(aql, **query_options)
+
+    def __insert_adb_docs(
+        self, col: str, docs: List[Json], import_options: Any
+    ) -> None:
+        """Insert ArangoDB documents into their ArangoDB collection.
+
+        :param col: The ArangoDB collection name
+        :type col: str
+        :param docs: To-be-inserted ArangoDB documents
+        :type docs: List[Json]
+        :param import_options: Keyword arguments to specify additional
+            parameters for ArangoDB document insertion. Full parameter list:
+            https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
+        """
+        logger.debug(f"Inserting {len(docs)} documents into '{col}'")
+        result = self.__db.collection(col).import_bulk(docs, **import_options)
+        logger.debug(result)

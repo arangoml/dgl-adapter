@@ -7,7 +7,7 @@ from typing import Any, List, Set, Union
 from arango.graph import Graph as ArangoDBGraph
 from dgl import DGLGraph
 from dgl.heterograph import DGLHeteroGraph
-from torch.functional import Tensor
+from torch import Tensor
 
 from .typings import ArangoMetagraph, DGLCanonicalEType, Json
 
@@ -53,6 +53,9 @@ class Abstract_ADBDGL_Adapter(ABC):
         raise NotImplementedError  # pragma: no cover
 
     def __fetch_adb_docs(self) -> None:
+        raise NotImplementedError  # pragma: no cover
+
+    def __insert_adb_docs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
     @property
