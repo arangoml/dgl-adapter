@@ -34,12 +34,11 @@ def progress(
 def validate_adb_metagraph(metagraph: Dict[Any, Dict[Any, Any]]) -> None:
     meta: Dict[Any, Any]
 
-    if "edgeCollections" in metagraph and "vertexCollections" not in metagraph:
-        msg = """
-            Metagraph must have 'vertexCollections' if
-            'edgeCollections' is specified.
-        """
-        raise ADBMetagraphError(msg)
+    if "vertexCollections" not in metagraph:
+        raise ADBMetagraphError("Missing 'vertexCollections' key in metagraph")
+
+    if "edgeCollections" not in metagraph:
+        raise ADBMetagraphError("Missing 'edgeCollections' key in metagraph")
 
     for parent_key in ["vertexCollections", "edgeCollections"]:
         for col, meta in metagraph.get(parent_key, {}).items():
@@ -70,7 +69,7 @@ def validate_adb_metagraph(metagraph: Dict[Any, Dict[Any, Any]]) -> None:
                             raise ADBMetagraphError(msg)
 
 
-def validate_pyg_metagraph(metagraph: Dict[Any, Dict[Any, Any]]) -> None:
+def validate_dgl_metagraph(metagraph: Dict[Any, Dict[Any, Any]]) -> None:
     meta: Dict[Any, Any]
 
     for node_type in metagraph.get("nodeTypes", {}).keys():

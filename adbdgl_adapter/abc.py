@@ -16,17 +16,15 @@ class Abstract_ADBDGL_Adapter(ABC):
 
     def arangodb_to_dgl(
         self, name: str, metagraph: ADBMetagraph, **query_options: Any
-    ) -> Union[DGLGraph, DGLHeteroGraph]:
+    ) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
     def arangodb_collections_to_dgl(
         self, name: str, v_cols: Set[str], e_cols: Set[str], **query_options: Any
-    ) -> Union[DGLGraph, DGLHeteroGraph]:
+    ) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
-    def arangodb_graph_to_dgl(
-        self, name: str, **query_options: Any
-    ) -> Union[DGLGraph, DGLHeteroGraph]:
+    def arangodb_graph_to_dgl(self, name: str, **query_options: Any) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
     def dgl_to_arangodb(
@@ -75,14 +73,10 @@ class Abstract_ADBDGL_Adapter(ABC):
     def __build_dataframe_from_tensor(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    @property
-    def DEFAULT_CANONICAL_ETYPE(self) -> List[DGLCanonicalEType]:
-        return [("_N", "_E", "_N")]
-
 
 class Abstract_ADBDGL_Controller(ABC):
-    def _prepare_pyg_node(self, dgl_node: Json, node_type: str) -> Json:
+    def _prepare_dgl_node(self, dgl_node: Json, node_type: str) -> Json:
         raise NotImplementedError  # pragma: no cover
 
-    def _prepare_pyg_edge(self, dgl_edge: Json, edge_type: DGLCanonicalEType) -> Json:
+    def _prepare_dgl_edge(self, dgl_edge: Json, edge_type: DGLCanonicalEType) -> Json:
         raise NotImplementedError  # pragma: no cover
