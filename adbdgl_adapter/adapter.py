@@ -125,7 +125,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for v_col, meta in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
 
-            df = self.__fetch_adb_docs(v_col, query_options)
+            df = self.__fetch_adb_docs(v_col, meta, query_options)
             adb_map.update({adb_id: dgl_id for dgl_id, adb_id in enumerate(df["_id"])})
 
             for k, v in meta.items():
@@ -135,7 +135,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for e_col, meta in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
 
-            df = self.__fetch_adb_docs(e_col, query_options)
+            df = self.__fetch_adb_docs(e_col, meta, query_options)
             df["from_col"] = df["_from"].str.split("/").str[0]
             df["to_col"] = df["_to"].str.split("/").str[0]
 
@@ -144,12 +144,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             ):
                 edge_type: DGLCanonicalEType = (from_col, e_col, to_col)
                 if from_col not in v_cols or to_col not in v_cols:
-                    msg = f"""
-                        Skipping {edge_type}, as its vertex collections
-                        were not specified in the metagraph.
-                    """
-                    logger.debug(msg)
-                    continue
+                    logger.debug(f"Skipping {edge_type}")
+                    continue  # partial edge collection import to dgl
 
                 logger.debug(f"Preparing {count} '{edge_type}' edges")
 
@@ -336,7 +332,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             df["_from"] = from_col + "/" + df["_from"].astype(str)
             df["_to"] = to_col + "/" + df["_to"].astype(str)
 
-            meta = e_meta.get(e_type, {})            
+            meta = e_meta.get(e_type, {})
             for k, t in dgl_g.edges[e_key].data.items():
                 if type(t) is Tensor and len(t) == dgl_g.num_edges(e_key):
                     v = meta.get(k, k)
@@ -445,21 +441,27 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     dgl_tensor if has_one_type else {data_type: dgl_tensor}
                 )
 
-    def __fetch_adb_docs(self, col: str, query_options: Any) -> DataFrame:
+    def __fetch_adb_docs(
+        self, col: str, meta: Dict[str, ADBMetagraphValues], query_options: Any
+    ) -> DataFrame:
         """Fetches ArangoDB documents within a collection. Returns the
             documents in a Pandas DataFrame.
 
         :param col: The ArangoDB collection.
         :type col: str
+        :param meta: The metagraph specification for **col**.
+        :type meta: Dict[str, ADBMetagraphValues]
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
         :type query_options: Any
         :return: A Pandas DataFrame representing the ArangoDB documents.
         :rtype: pandas.DataFrame
         """
-        aql = """
+        # Only return the entire document if **meta** is not empty
+        data = "doc" if meta else "{_id: doc._id, _from: doc._from, _to: doc._to}"
+        aql = f"""
             FOR doc IN @@col
-                RETURN doc
+                RETURN {data}
         """
 
         with progress(
