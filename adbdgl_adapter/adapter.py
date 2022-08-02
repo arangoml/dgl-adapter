@@ -131,6 +131,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             for k, v in meta.items():
                 ndata[k][v_col] = self.__build_tensor_from_dataframe(df, k, v)
 
+        et_blacklist: List[DGLCanonicalEType] = []  # A list of skipped edge types
         v_cols: List[str] = list(metagraph["vertexCollections"].keys())
         for e_col, meta in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
@@ -145,6 +146,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 edge_type: DGLCanonicalEType = (from_col, e_col, to_col)
                 if from_col not in v_cols or to_col not in v_cols:
                     logger.debug(f"Skipping {edge_type}")
+                    et_blacklist.append(edge_type)
                     continue  # partial edge collection import to dgl
 
                 logger.debug(f"Preparing {count} '{edge_type}' edges")
@@ -159,6 +161,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     edata[k][edge_type] = self.__build_tensor_from_dataframe(
                         et_df, k, v
                     )
+
+        if not data_dict:
+            msg = f"""
+                Can't create DGL graph: no complete edge types found.
+                The following edge types were skipped due to missing
+                vertex collection specifications: {et_blacklist}
+            """
+            raise ValueError(msg)
 
         dgl_g: Union[DGLGraph, DGLHeteroGraph]
         if is_homogeneous:

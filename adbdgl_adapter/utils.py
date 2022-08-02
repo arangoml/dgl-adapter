@@ -34,14 +34,14 @@ def progress(
 def validate_adb_metagraph(metagraph: Dict[Any, Dict[Any, Any]]) -> None:
     meta: Dict[Any, Any]
 
-    if "vertexCollections" not in metagraph:
+    if not metagraph.get("vertexCollections"):
         raise ADBMetagraphError("Missing 'vertexCollections' key in metagraph")
 
-    if "edgeCollections" not in metagraph:
+    if not metagraph.get("edgeCollections"):
         raise ADBMetagraphError("Missing 'edgeCollections' key in metagraph")
 
     for parent_key in ["vertexCollections", "edgeCollections"]:
-        for col, meta in metagraph.get(parent_key, {}).items():
+        for col, meta in metagraph[parent_key].items():
             if type(col) != str:
                 msg = f"Invalid {parent_key} sub-key type: {col} must be str"
                 raise ADBMetagraphError(msg)

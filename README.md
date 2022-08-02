@@ -47,7 +47,7 @@ Also available as an ArangoDB Lunch & Learn session: [Graph & Beyond Course #2.8
 ```py
 import pandas
 import torch
-from dgl import heterograph
+import dgl
 
 from arango import ArangoClient  # Python-Arango driver
 
@@ -64,7 +64,7 @@ hetero_graph = dgl.heterograph({
 })
 hetero_graph.nodes["user"].data["features"] = torch.tensor([21, 44, 16, 25])
 hetero_graph.nodes["user"].data["label"] = torch.tensor([1, 2, 0, 1])
-hetero_graph.nodes["game"].data["features"] = torch.tensor([[0, 0], [0, 1], [1, 0], [1, 1]])
+hetero_graph.nodes["game"].data["features"] = torch.tensor([[0, 0], [0, 1], [1, 0], [1, 1], [1, 1]])
 hetero_graph.edges[("user", "plays", "game")].data["features"] = torch.tensor([[6, 1], [1000, 0]])
 
 adbdgl_adapter = ADBDGL_Adapter(db)
@@ -86,7 +86,7 @@ def label_tensor_to_2_column_dataframe(dgl_tensor):
     label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
 
     df = pandas.DataFrame(columns=["label_num", "label_str"])
-    df["label_num"] = pyg_tensor.tolist()
+    df["label_num"] = dgl_tensor.tolist()
     df["label_str"] = df["label_num"].map(label_map)
 
     return df

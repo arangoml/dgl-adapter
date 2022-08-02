@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from arango import ArangoClient
-from arango.http import DefaultHTTPClient
 from arango.database import StandardDatabase
+from arango.http import DefaultHTTPClient
 from dgl import DGLGraph, DGLHeteroGraph, heterograph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from pandas import DataFrame
