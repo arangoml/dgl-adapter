@@ -7,7 +7,7 @@ from typing import Any, DefaultDict, Dict, List, Set, Union
 from arango.database import Database
 from arango.graph import Graph as ADBGraph
 from dgl import DGLGraph, DGLHeteroGraph, graph, heterograph
-from dgl.view import HeteroEdgeDataView, HeteroNodeDataView
+from dgl.view import EdgeSpace, HeteroEdgeDataView, HeteroNodeDataView, NodeSpace
 from pandas import DataFrame
 from torch import Tensor, cat, tensor
 
@@ -15,12 +15,15 @@ from .abc import Abstract_ADBDGL_Adapter
 from .controller import ADBDGL_Controller
 from .exceptions import ADBMetagraphError, DGLMetagraphError
 from .typings import (
+    ADBMap,
     ADBMetagraph,
     ADBMetagraphValues,
     DGLCanonicalEType,
     DGLDataDict,
+    DGLEData,
     DGLMetagraph,
     DGLMetagraphValues,
+    DGLNData,
     Json,
 )
 from .utils import logger, progress, validate_adb_metagraph, validate_dgl_metagraph
@@ -106,8 +109,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             and len(metagraph["edgeCollections"]) == 1
         )
 
-        # Maps ArangoDB vertex IDs to DGL node IDs
-        adb_map: Dict[str, Json] = dict()
+        # Maps ArangoDB Vertex _keys to PyG Node ids
+        adb_map: ADBMap = defaultdict(dict)
 
         # The data for constructing a graph,
         # which takes the form of (U, V).
@@ -115,30 +118,31 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         data_dict: DGLDataDict = dict()
 
         # The node data view for storing node features
-        ndata: DefaultDict[str, DefaultDict[str, Tensor]]
-        ndata = defaultdict(lambda: defaultdict())
+        ndata: DGLNData = defaultdict(lambda: defaultdict())
 
         # The edge data view for storing edge features
-        edata: DefaultDict[str, DefaultDict[DGLCanonicalEType, Tensor]]
-        edata = defaultdict(lambda: defaultdict())
+        edata: DGLEData = defaultdict(lambda: defaultdict())
 
         for v_col, meta in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
 
-            df = self.__fetch_adb_docs(v_col, meta, query_options)
-            adb_map.update({adb_id: dgl_id for dgl_id, adb_id in enumerate(df["_id"])})
+            df = self.__fetch_adb_docs(v_col, meta == {}, query_options)
+            adb_map[v_col] = {
+                adb_id: dgl_id for dgl_id, adb_id in enumerate(df["_key"])
+            }
 
             for k, v in meta.items():
                 ndata[k][v_col] = self.__build_tensor_from_dataframe(df, k, v)
 
+        et_df: DataFrame
         et_blacklist: List[DGLCanonicalEType] = []  # A list of skipped edge types
         v_cols: List[str] = list(metagraph["vertexCollections"].keys())
         for e_col, meta in metagraph["edgeCollections"].items():
             logger.debug(f"Preparing '{e_col}' edges")
 
-            df = self.__fetch_adb_docs(e_col, meta, query_options)
-            df["from_col"] = df["_from"].str.split("/").str[0]
-            df["to_col"] = df["_to"].str.split("/").str[0]
+            df = self.__fetch_adb_docs(e_col, meta == {}, query_options)
+            df[["from_col", "from_key"]] = df["_from"].str.split("/", 1, True)
+            df[["to_col", "to_key"]] = df["_to"].str.split("/", 1, True)
 
             for (from_col, to_col), count in (
                 df[["from_col", "to_col"]].value_counts().items()
@@ -153,8 +157,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
                 # Get the edge data corresponding to the current edge type
                 et_df = df[(df["from_col"] == from_col) & (df["to_col"] == to_col)]
-                from_nodes = [adb_map[_id] for _id in et_df["_from"]]
-                to_nodes = [adb_map[_id] for _id in et_df["_to"]]
+                from_nodes = et_df["from_key"].map(adb_map[from_col]).tolist()
+                to_nodes = et_df["to_key"].map(adb_map[to_col]).tolist()
 
                 data_dict[edge_type] = (tensor(from_nodes), tensor(to_nodes))
                 for k, v in meta.items():
@@ -172,10 +176,12 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         dgl_g: Union[DGLGraph, DGLHeteroGraph]
         if is_homogeneous:
+            num_nodes = len(adb_map[v_col])
             data = list(data_dict.values())[0]
-            dgl_g = graph(data)
+            dgl_g = graph(data, num_nodes=num_nodes)
         else:
-            dgl_g = heterograph(data_dict)
+            num_nodes_dict = {v_col: len(adb_map[v_col]) for v_col in adb_map}
+            dgl_g = heterograph(data_dict, num_nodes_dict)
 
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.canonical_etypes) == 1
@@ -285,7 +291,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         node_types: List[str]
         edge_types: List[DGLCanonicalEType]
-        if metagraph and explicit_metagraph:
+        explicit_metagraph = metagraph != {} and explicit_metagraph
+        if explicit_metagraph:
             node_types = metagraph.get("nodeTypes", {}).keys()  # type: ignore
             edge_types = metagraph.get("edgeTypes", {}).keys()  # type: ignore
 
@@ -315,20 +322,17 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         for n_type in node_types:
             n_key = None if has_one_ntype else n_type
 
-            num_nodes = dgl_g.num_nodes(n_key)
-            df = DataFrame([{"_key": str(i)} for i in range(num_nodes)])
-
             meta = n_meta.get(n_type, {})
-            for k, t in dgl_g.nodes[n_key].data.items():
-                if type(t) is Tensor and len(t) == num_nodes:
-                    v = meta.get(k, k)
-                    df = df.join(self.__build_dataframe_from_tensor(t, k, v))
+            df = DataFrame([{"_key": str(i)} for i in range(dgl_g.num_nodes(n_key))])
+            df = self.__set_adb_data(
+                df, meta, dgl_g.nodes[n_key].data, explicit_metagraph
+            )
 
             if type(self.__cntrl) is not ADBDGL_Controller:
                 f = lambda n: self.__cntrl._prepare_dgl_node(n, n_type)
                 df = df.apply(f, axis=1)
 
-            self.__insert_adb_docs(n_type, df.to_dict("records"), import_options)
+            self.__insert_adb_docs(n_type, df, import_options)
 
         e_meta = metagraph.get("edgeTypes", {})
         for e_type in edge_types:
@@ -336,23 +340,22 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             from_col, _, to_col = e_type
 
             from_nodes, to_nodes = dgl_g.edges(etype=e_key)
-            df = DataFrame(
-                zip(*(from_nodes.tolist(), to_nodes.tolist())), columns=["_from", "_to"]
-            )
-            df["_from"] = from_col + "/" + df["_from"].astype(str)
-            df["_to"] = to_col + "/" + df["_to"].astype(str)
+            data = zip(*(from_nodes.tolist(), to_nodes.tolist()))
+            df = DataFrame(data, columns=["_from", "_to"])
 
             meta = e_meta.get(e_type, {})
-            for k, t in dgl_g.edges[e_key].data.items():
-                if type(t) is Tensor and len(t) == dgl_g.num_edges(e_key):
-                    v = meta.get(k, k)
-                    df = df.join(self.__build_dataframe_from_tensor(t, k, v))
+            df = self.__set_adb_data(
+                df, meta, dgl_g.edges[e_key].data, explicit_metagraph
+            )
+
+            df["_from"] = from_col + "/" + df["_from"].astype(str)
+            df["_to"] = to_col + "/" + df["_to"].astype(str)
 
             if type(self.__cntrl) is not ADBDGL_Controller:
                 f = lambda e: self.__cntrl._prepare_dgl_edge(e, e_type)
                 df = df.apply(f, axis=1)
 
-            self.__insert_adb_docs(e_type, df.to_dict("records"), import_options)
+            self.__insert_adb_docs(e_type, df, import_options)
 
         logger.info(f"Created ArangoDB '{name}' Graph")
         return adb_graph
@@ -423,55 +426,31 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         orphan_collections = set(node_types) ^ non_orphan_collections
         return list(orphan_collections)
 
-    def __set_dgl_data(
-        self,
-        dgl_data: Union[HeteroNodeDataView, HeteroEdgeDataView],
-        dgl_data_temp: Union[
-            DefaultDict[str, DefaultDict[str, Tensor]],
-            DefaultDict[str, DefaultDict[DGLCanonicalEType, Tensor]],
-        ],
-        has_one_type: bool,
-    ) -> None:
-        """Copies **dgl_data_temp** into **dgl_data**. This method is (unfortunately)
-            required, since a dgl graph's `ndata` and `edata` properties can't be
-            manually set (i.e `g.ndata = ndata` is not possible).
-
-        :param dgl_data: The (empty) ndata or edata instance attribute of a dgl graph,
-            which is about to receive **dgl_data_temp**.
-        :type dgl_data: Union[dgl.view.HeteroNodeDataView, dgl.view.HeteroEdgeDataView]
-        :param dgl_data_temp: A temporary place to store the ndata or edata features.
-        :type dgl_data_temp: DefaultDict[str, DefaultDict[str, Tensor]]
-        :param has_one_type: Set to True if the DGL graph only has one
-            node type or edge type.
-        :type has_one_type: bool
-        """
-        for feature_name, feature_map in dgl_data_temp.items():
-            for data_type, dgl_tensor in feature_map.items():
-                dgl_data[feature_name] = (
-                    dgl_tensor if has_one_type else {data_type: dgl_tensor}
-                )
-
     def __fetch_adb_docs(
-        self, col: str, meta: Dict[str, ADBMetagraphValues], query_options: Any
+        self, col: str, empty_meta: bool, query_options: Any
     ) -> DataFrame:
         """Fetches ArangoDB documents within a collection. Returns the
-            documents in a Pandas DataFrame.
+            documents in a DataFrame.
 
         :param col: The ArangoDB collection.
         :type col: str
-        :param meta: The metagraph specification for **col**.
-        :type meta: Dict[str, ADBMetagraphValues]
+        :param empty_meta: Set to True if the metagraph specification
+            for **col** is empty.
+        :type empty_meta: bool
         :param query_options: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
         :type query_options: Any
-        :return: A Pandas DataFrame representing the ArangoDB documents.
+        :return: A DataFrame representing the ArangoDB documents.
         :rtype: pandas.DataFrame
         """
-        # Only return the entire document if **meta** is not empty
-        data = "doc" if meta else "{_id: doc._id, _from: doc._from, _to: doc._to}"
+        # Only return the entire document if **empty_meta** is False
         aql = f"""
             FOR doc IN @@col
-                RETURN {data}
+                RETURN {
+                    "{ _key: doc._key, _from: doc._from, _to: doc._to }"
+                    if empty_meta
+                    else "doc"
+                }
         """
 
         with progress(
@@ -488,14 +467,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             )
 
     def __insert_adb_docs(
-        self, doc_type: Union[str, DGLCanonicalEType], docs: List[Json], kwargs: Any
+        self, doc_type: Union[str, DGLCanonicalEType], df: DataFrame, kwargs: Any
     ) -> None:
         """Insert ArangoDB documents into their ArangoDB collection.
 
         :param doc_type: The node or edge type of the soon-to-be ArangoDB documents
         :type doc_type: str | tuple[str, str, str]
-        :param docs: To-be-inserted ArangoDB documents
-        :type docs: List[Json]
+        :param df: To-be-inserted ArangoDB documents, formatted as a DataFrame
+        :type df: pandas.DataFrame
         :param kwargs: Keyword arguments to specify additional
             parameters for ArangoDB document insertion. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
@@ -503,14 +482,87 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         col = doc_type if type(doc_type) is str else doc_type[1]
 
         with progress(
-            f"Import: {doc_type} ({len(docs)})",
-            text_style="#349AEF",
-            spinner_style="#FBFEFE",
+            f"Import: {doc_type} ({len(df)})",
+            text_style="#825FE1",
+            spinner_style="#3AA7F4",
         ) as p:
             p.add_task("__insert_adb_docs")
 
+            docs = df.to_dict("records")
             result = self.__db.collection(col).import_bulk(docs, **kwargs)
             logger.debug(result)
+
+    def __set_dgl_data(
+        self,
+        dgl_data: Union[HeteroNodeDataView, HeteroEdgeDataView],
+        dgl_data_temp: Union[DGLNData, DGLEData],
+        has_one_type: bool,
+    ) -> None:
+        """Copies **dgl_data_temp** into **dgl_data**. This method is (unfortunately)
+            required, since a dgl graph's `ndata` and `edata` properties can't be
+            manually set (i.e `g.ndata = ndata` is not possible).
+
+        :param dgl_data: The (empty) ndata or edata instance attribute of a dgl graph,
+            which is about to receive **dgl_data_temp**.
+        :type dgl_data: Union[dgl.view.HeteroNodeDataView, dgl.view.HeteroEdgeDataView]
+        :param dgl_data_temp: A temporary place to store the ndata or edata features.
+        :type dgl_data_temp: adbdgl_adapter.typings.(DGLNData | DGLEData)
+        :param has_one_type: Set to True if the DGL graph only has one
+            node type or edge type.
+        :type has_one_type: bool
+        """
+        for feature_name, feature_map in dgl_data_temp.items():
+            for data_type, dgl_tensor in feature_map.items():
+                dgl_data[feature_name] = (
+                    dgl_tensor if has_one_type else {data_type: dgl_tensor}
+                )
+
+    def __set_adb_data(
+        self,
+        df: DataFrame,
+        meta: Dict[Any, DGLMetagraphValues],
+        dgl_data: Union[NodeSpace, EdgeSpace],
+        explicit_metagraph: bool,
+    ) -> DataFrame:
+        """A helper method to build the ArangoDB Dataframe for the given
+        collection. Is responsible for creating "sub-DataFrames" from DGL tensors,
+        and appending them to the main dataframe **df**. If the data
+        does not adhere to the supported types, or is not of specific length,
+        then it is silently skipped.
+
+        :param df: The main ArangoDB DataFrame containing (at minimum)
+            the vertex/edge _id or _key attribute.
+        :type df: pandas.DataFrame
+        :param meta: The metagraph associated to the
+            current PyG node or edge type. e.g metagraph['nodeTypes']['v0']
+        :type meta: Dict[Any, adbdgl_adapter.typings.DGLMetagraphValues]
+        :param dgl_data: The NodeSpace or EdgeSpace of the current
+            DGL node or edge type.
+        :type pyg_data: dgl.view.(NodeSpace | EdgeSpace)
+        :param explicit_metagraph: The value of **explicit_metagraph**
+            in **pyg_to_arangodb**.
+        :type explicit_metagraph: bool
+        :return: The completed DataFrame for the (soon-to-be) ArangoDB collection.
+        :rtype: pandas.DataFrame
+        :raise ValueError: If an unsupported PyG data value is found.
+        """
+        logger.debug(
+            f"__set_adb_data(df, {meta}, {type(dgl_data)}, {explicit_metagraph}"
+        )
+
+        if explicit_metagraph:
+            dgl_keys = set(meta.keys())
+        else:
+            dgl_keys = dgl_data.keys()
+
+        for k in dgl_keys:
+            data = dgl_data[k]
+            meta_val = meta.get(k, str(k))
+
+            if type(data) is Tensor and len(data) == len(df):
+                df = df.join(self.__build_dataframe_from_tensor(data, k, meta_val))
+
+        return df
 
     def __build_tensor_from_dataframe(
         self,
@@ -533,7 +585,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :rtype: torch.Tensor
         :raise adbdgl_adapter.exceptions.ADBMetagraphError: If invalid **meta_val**.
         """
-        logger.debug(f"__build_tensor_from_dataframe(df, '{meta_key}', {meta_val})")
+        logger.debug(
+            f"__build_tensor_from_dataframe(df, '{meta_key}', {type(meta_val)})"
+        )
 
         if type(meta_val) is str:
             return tensor(adb_df[meta_val].to_list())
@@ -566,7 +620,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     def __build_dataframe_from_tensor(
         self,
         dgl_tensor: Tensor,
-        meta_key: str,
+        meta_key: Any,
         meta_val: DGLMetagraphValues,
     ) -> DataFrame:
         """Builds a Pandas DataFrame from DGL Tensor, based on
@@ -575,7 +629,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param dgl_tensor: The Tensor representing DGL data.
         :type dgl_tensor: torch.Tensor
         :param meta_key: The current DGL-ArangoDB metagraph key
-        :type meta_key
+        :type meta_key: Any
         :param meta_val: The value mapped to the DGL-ArangoDB metagraph key to
             help convert **tensor** into a Pandas Dataframe.
             e.g the value of `metagraph['nodeTypes']['users']['x']`.
@@ -584,7 +638,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :rtype: pandas.DataFrame
         :raise adbdgl_adapter.exceptions.DGLMetagraphError: If invalid **meta_val**.
         """
-        logger.debug(f"__build_dataframe_from_tensor(df, '{meta_key}', {meta_val})")
+        logger.debug(
+            f"__build_dataframe_from_tensor(df, '{meta_key}', {type(meta_val)})"
+        )
 
         if type(meta_val) in [str, list]:
             columns = [meta_val] if type(meta_val) is str else meta_val
