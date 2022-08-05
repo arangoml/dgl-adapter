@@ -451,9 +451,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         """
 
         with progress(
-            f"Export: {col}",
-            text_style="#97C423",
-            spinner_style="#7D3B04",
+            f"(ADB → DGL): {col}",
+            text_style="#319BF5",
+            spinner_style="#FCFDFC",
         ) as p:
             p.add_task("__fetch_adb_docs")
 
@@ -479,9 +479,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         col = doc_type if type(doc_type) is str else doc_type[1]
 
         with progress(
-            f"Import: {doc_type} ({len(df)})",
-            text_style="#825FE1",
-            spinner_style="#3AA7F4",
+            f"(DGL → ADB): {doc_type} ({len(df)})",
+            text_style="#97C423",
+            spinner_style="#994602",
         ) as p:
             p.add_task("__insert_adb_docs")
 
