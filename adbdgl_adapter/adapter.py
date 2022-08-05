@@ -495,7 +495,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         dgl_data: DGLData,
         df: DataFrame,
     ) -> None:
-        """A helper method to build the DGL NodeStorage or EdgeStorage object
+        """A helper method to build the DGL NodeSpace or EdgeSpace object
         for the DGL graph. Is responsible for preparing the input **meta** such
         that it becomes a dictionary, and building DGL-ready tensors from the
         ArangoDB DataFrame **df**.
@@ -512,12 +512,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type df: pandas.DataFrame
         """
         valid_meta: Dict[str, ADBMetagraphValues]
-
-        if type(meta) is dict:
-            valid_meta = meta
-
-        if type(meta) is set:
-            valid_meta = {m: m for m in meta}
+        valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
 
         for k, v in valid_meta.items():
             dgl_data[k][data_type] = self.__build_tensor_from_dataframe(df, k, v)
@@ -581,12 +576,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         )
 
         valid_meta: Dict[Any, DGLMetagraphValues]
-
-        if type(meta) is dict:
-            valid_meta = meta
-
-        if type(meta) is set:
-            valid_meta = {m: m for m in meta}
+        valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
 
         if explicit_metagraph:
             dgl_keys = set(valid_meta.keys())

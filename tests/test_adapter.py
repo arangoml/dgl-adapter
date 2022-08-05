@@ -767,12 +767,7 @@ def assert_dgl_to_adb_meta(
     explicit_metagraph: bool,
 ) -> None:
     valid_meta: Dict[Any, DGLMetagraphValues]
-
-    if type(meta) is dict:
-        valid_meta = meta
-
-    if type(meta) is set:
-        valid_meta = {m : m for m in meta}
+    valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
 
     if explicit_metagraph:
         dgl_keys = set(valid_meta.keys())
