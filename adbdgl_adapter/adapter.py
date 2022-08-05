@@ -358,7 +358,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         return adb_graph
 
     def etypes_to_edefinitions(self, edge_types: List[DGLCanonicalEType]) -> List[Json]:
-        """Converts a DGL graph's canonical_etypes property to ArangoDB graph edge definitions
+        """Converts DGL canonical_etypes to ArangoDB edge_definitions
 
         :param edge_types: A list of string triplets (str, str, str) for
             source node type, edge type and destination node type.
