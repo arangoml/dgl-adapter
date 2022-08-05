@@ -88,6 +88,27 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param metagraph: An object defining vertex & edge collections to import
             to DGL, along with collection-level specifications to indicate
             which ArangoDB attributes will become DGL features/labels.
+
+            The current supported **metagraph** values are:
+                1) Set[str]: The set of DGL-ready ArangoDB attributes to store
+                    in your DGL graph.
+
+                2) Dict[str, str]: The DGL property name mapped to the ArangoDB
+                    attribute name that stores your DGL ready data.
+
+                3) Dict[str, Dict[str, None | Callable]]:
+                    The DGL property name mapped to a dictionary, which maps your
+                    ArangoDB attribute names to a callable Python Class
+                    (i.e has a `__call__` function defined), or to None
+                    (if the ArangoDB attribute is already a list of numerics).
+                    NOTE: The `__call__` function must take as input a Pandas DataFrame,
+                    and must return a PyTorch Tensor.
+
+                4) Dict[str, Callable[[pandas.DataFrame], torch.Tensor]]:
+                    The DGL property name mapped to a user-defined function
+                    for custom behaviour. NOTE: The function must take as input
+                    a Pandas DataFrame, and must return a PyTorch Tensor.
+
             See below for examples of **metagraph**.
         :type metagraph: adbdgl_adapter.typings.ADBMetagraph
         :param query_options: Keyword arguments to specify AQL query options when
@@ -98,7 +119,107 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :rtype: dgl.DGLGraph | dgl.DGLHeteroGraph
         :raise adbdgl_adapter.exceptions.ADBMetagraphError: If invalid metagraph.
 
-        #TODO: Metagraph examples
+        **metagraph** examples
+
+        1)
+        .. code-block:: python
+        {
+            "vertexCollections": {
+                "v0": {'x', 'y'}, # equivalent to {'x': 'x', 'y': 'y'}
+                "v1": {'x'},
+                "v2": {'x'},
+            },
+            "edgeCollections": {
+                "e0": {'edge_attr'},
+                "e1": {'edge_weight'},
+            },
+        }
+
+        The metagraph above specifies that each document
+        within the "v0" ArangoDB collection has a "pre-built" feature matrix
+        named "x", and also has a node label named "y".
+        We map these keys to the "x" and "y" properties of the DGL graph.
+
+        2)
+        .. code-block:: python
+        {
+            "vertexCollections": {
+                "v0": {'x': 'v0_features', 'y': 'label'},
+                "v1": {'x': 'v1_features'},
+                "v2": {'x': 'v2_features'},
+            },
+            "edgeCollections": {
+                "e0": {'edge_attr': 'e0_features'},
+                "e1": {'edge_weight': 'edge_weight'},
+            },
+        }
+
+        The metagraph above specifies that each document
+        within the "v0" ArangoDB collection has a "pre-built" feature matrix
+        named "v0_features", and also has a node label named "label".
+        We map these keys to the "x" and "y" properties of the DGL graph.
+
+        3)
+        .. code-block:: python
+        from adbdgl_adapter.encoders import IdentityEncoder, CategoricalEncoder
+
+        {
+            "vertexCollections": {
+                "Movies": {
+                    "x": {
+                        "Action": IdentityEncoder(dtype=torch.long),
+                        "Drama": IdentityEncoder(dtype=torch.long),
+                        'Misc': None
+                    },
+                    "y": "Comedy",
+                },
+                "Users": {
+                    "x": {
+                        "Gender": CategoricalEncoder(),
+                        "Age": IdentityEncoder(dtype=torch.long),
+                    }
+                },
+            },
+            "edgeCollections": {
+                "Ratings": { "edge_weight": "Rating" }
+            },
+        }
+
+        The metagraph above will build the "Movies" feature matrix 'x'
+        using the ArangoDB 'Action', 'Drama' & 'misc' attributes, by relying on
+        the user-specified Encoders (see adbdgl_adapter.encoders for examples).
+        NOTE: If the mapped value is `None`, then it assumes that the ArangoDB attribute
+        value is a list containing numerical values only.
+
+        4)
+        .. code-block:: python
+        def udf_v0_x(v0_df):
+            # process v0_df here to return v0 "x" feature matrix
+            # ...
+            return torch.tensor(v0_df["x"].to_list())
+
+        def udf_v1_x(v1_df):
+            # process v1_df here to return v1 "x" feature matrix
+            # ...
+            return torch.tensor(v1_df["x"].to_list())
+
+        {
+            "vertexCollections": {
+                "v0": {
+                    "x": udf_v0_x, # named functions
+                    "y": (lambda df: tensor(df["y"].to_list())), # lambda functions
+                },
+                "v1": {"x": udf_v1_x},
+                "v2": {"x": (lambda df: tensor(df["x"].to_list()))},
+            },
+            "edgeCollections": {
+                "e0": {"edge_attr": (lambda df: tensor(df["edge_attr"].to_list()))},
+            },
+        }
+
+        The metagraph above provides an interface for a user-defined function to
+        build a DGL-ready Tensor from a DataFrame equivalent to the
+        associated ArangoDB collection.
         """
         logger.debug(f"--arangodb_to_dgl('{name}')--")
 
@@ -258,7 +379,26 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :param metagraph: An optional object mapping the DGL keys of
             the node & edge data to strings, list of strings, or user-defined
             functions. NOTE: Unlike the metagraph for ArangoDB to DGL, this
-            one is optional. See below for an example of **metagraph**.
+            one is optional.
+
+            The current supported **metagraph** values are:
+                1) Set[str]: The set of DGL data properties to store
+                    in your ArangoDB database.
+
+                2) Dict[str, str]: The DGL property name mapped to the ArangoDB
+                    attribute name that will be used to store your DGL data in ArangoDB.
+
+                3) List[str]: A list of ArangoDB attribute names that will break down
+                    your tensor data, resulting in one ArangoDB attribute per feature.
+                    Must know the number of node/edge features in advance to take
+                    advantage of this metagraph value type.
+
+                4) Dict[str, Callable[[pandas.DataFrame], torch.Tensor]]:
+                    The DGL property name mapped to a user-defined function
+                    for custom behaviour. NOTE: The function must take as input
+                    a PyTorch Tensor, and must return a Pandas DataFrame.
+
+            See below for an example of **metagraph**.
         :type metagraph: adbdgl_adapter.typings.DGLMetagraph
         :param explicit_metagraph: Whether to take the metagraph at face value or not.
             If False, node & edge types OMITTED from the metagraph will be
@@ -276,7 +416,41 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :rtype: arango.graph.Graph
         :raise adbdgl_adapter.exceptions.DGLMetagraphError: If invalid metagraph.
 
-        #TODO: Metagraph examples
+        **metagraph** example
+
+        .. code-block:: python
+        def y_tensor_to_2_column_dataframe(dgl_tensor):
+            # A user-defined function to create two ArangoDB attributes
+            # out of the 'y' label tensor
+            label_map = {0: "Kiwi", 1: "Blueberry", 2: "Avocado"}
+
+            df = pandas.DataFrame(columns=["label_num", "label_str"])
+            df["label_num"] = dgl_tensor.tolist()
+            df["label_str"] = df["label_num"].map(label_map)
+
+            return df
+
+        metagraph = {
+            "nodeTypes": {
+                "v0": {
+                    "x": "features",  # 1)
+                    "y": y_tensor_to_2_column_dataframe,  # 2)
+                },
+                "v1": {"x"} # 3)
+            },
+            "edgeTypes": {
+                ("v0", "e0", "v0"): {"edge_attr": [ "a", "b"]}, # 4)
+            },
+        }
+
+        The metagraph above accomplishes the following:
+        1) Renames the DGL 'v0' 'x' feature matrix to 'features'
+            when stored in ArangoDB.
+        2) Builds a 2-column Pandas DataFrame from the 'v0' 'y' labels
+            through a user-defined function for custom behaviour handling.
+        3) Transfers the DGL 'v1' 'x' feature matrix under the same name.
+        4) Dissasembles the 2-feature Tensor into two ArangoDB attributes,
+            where each attribute holds one feature value.
         """
         logger.debug(f"--dgl_to_arangodb('{name}')--")
 

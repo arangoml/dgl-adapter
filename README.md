@@ -98,14 +98,13 @@ metagraph = {
             "features": "user_age",  # 1) you can specify a string value for attribute renaming
             "label": label_tensor_to_2_column_dataframe,  # 2) you can specify a function for user-defined handling, as long as the function returns a Pandas DataFrame
         },
-        "game": {
-            # 3) you can specify a list of strings for tensor dissasembly (if you know the number of node/edge features in advance)
-            "features": ["is_multiplayer", "is_free_to_play"]
+        # 3) You can specify set of strings if you want to preserve the same PyG attribute names for the node/edge type
+        "game": {"features"} # this is equivalent to {"features": "features"}
         },
     },
     "edgeTypes": {
         ("user", "plays", "game"): {
-            # 3) you can specify a list of strings for tensor dissasembly (if you know the number of node/edge features in advance)
+            # 4) you can specify a list of strings for tensor dissasembly (if you know the number of node/edge features in advance)
             "features": ["hours_played", "is_satisfied_with_game"]
         },
     },
