@@ -1,25 +1,31 @@
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Union
-from pandas import DataFrame
 
 import pytest
-from arango.database import StandardDatabase
-from arango.graph import Graph as ArangoGraph
 from dgl import DGLGraph, DGLHeteroGraph
-from dgl.view import NodeSpace, EdgeSpace
-from dgl.heterograph import DGLHeteroGraph
-from torch import Tensor, tensor
+from dgl.view import EdgeSpace, NodeSpace
+from pandas import DataFrame
+from torch import Tensor, cat, long, tensor
 
 from adbdgl_adapter import ADBDGL_Adapter
-from adbdgl_adapter.encoders import IdentityEncoder
+from adbdgl_adapter.encoders import CategoricalEncoder, IdentityEncoder
 from adbdgl_adapter.exceptions import ADBMetagraphError, DGLMetagraphError
-from adbdgl_adapter.typings import *
+from adbdgl_adapter.typings import (
+    ADBMap,
+    ADBMetagraph,
+    ADBMetagraphValues,
+    DGLCanonicalEType,
+    DGLMetagraph,
+    DGLMetagraphValues,
+)
 from adbdgl_adapter.utils import validate_adb_metagraph, validate_dgl_metagraph
 
 from .conftest import (
+    Custom_ADBDGL_Controller,
     adbdgl_adapter,
-    db,
-    # con,
     arango_restore,
+    con,
+    db,
     get_fake_hetero_dataset,
     get_hypercube_graph,
     get_karate_graph,
@@ -27,6 +33,7 @@ from .conftest import (
     label_tensor_to_2_column_dataframe,
     udf_features_df_to_tensor,
     udf_key_df_to_tensor,
+    udf_users_features_tensor_to_df,
 )
 
 
@@ -194,13 +201,7 @@ def test_validate_adb_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             }
         ),
         # bad data type metagraph 2
-        (
-            {
-                "nodeTypes": {
-                    "ntype_a": {"a", "b", 3}
-                }
-            }
-        ),
+        ({"nodeTypes": {"ntype_a": {"a", "b", 3}}}),
         # bad meta_val
         (
             {
@@ -330,13 +331,11 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             "FakeHeterogeneous_3",
             get_fake_hetero_dataset(),
             {
-                "nodeTypes": {
-                    "v0": {"features", "label"}
-                },
+                "nodeTypes": {"v0": {"features", "label"}},
                 "edgeTypes": {("v0", "e0", "v0"): {"features"}},
             },
             True,
-            False,
+            True,
             {},
         ),
     ],
@@ -358,6 +357,24 @@ def test_dgl_to_adb(
     db.delete_graph(name, drop_collections=True)
 
 
+def test_dgl_to_arangodb_with_controller() -> None:
+    name = "Karate_3"
+    data = get_karate_graph()
+    db.delete_graph(name, drop_collections=True, ignore_missing=True)
+
+    ADBDGL_Adapter(db, Custom_ADBDGL_Controller()).dgl_to_arangodb(name, data)
+
+    for doc in db.collection(name + "_N"):
+        assert "foo" in doc
+        assert doc["foo"] == "bar"
+
+    for edge in db.collection(name + "_E"):
+        assert "bar" in edge
+        assert edge["bar"] == "foo"
+
+    db.delete_graph(name, drop_collections=True)
+
+
 @pytest.mark.parametrize(
     "adapter, name, metagraph, dgl_g_old",
     [
@@ -366,7 +383,7 @@ def test_dgl_to_adb(
             "Karate",
             {
                 "vertexCollections": {
-                    "Karate_N": {"node_features": "node_features", "label": "label"},
+                    "Karate_N": {"karate_label": "label"},
                 },
                 "edgeCollections": {
                     "Karate_E": {},
@@ -392,12 +409,12 @@ def test_dgl_to_adb(
             "Social",
             {
                 "vertexCollections": {
-                    "user": {"features": "node_features", "label": "label"},
-                    "game": {"features": "node_features"},
+                    "user": {"node_features": "features", "label": "label"},
+                    "game": {"node_features": "features"},
                     "topic": {},
                 },
                 "edgeCollections": {
-                    "plays": {"features": "edge_features"},
+                    "plays": {"edge_features": "features"},
                     "follows": {},
                 },
             },
@@ -411,6 +428,21 @@ def test_dgl_to_adb(
                     "v0": {"features": "features", "label": "label"},
                     "v1": {"features": "features"},
                     "v2": {"features": "features"},
+                },
+                "edgeCollections": {
+                    "e0": {},
+                },
+            },
+            get_fake_hetero_dataset(),
+        ),
+        (
+            adbdgl_adapter,
+            "HeterogeneousSimpleMetagraph",
+            {
+                "vertexCollections": {
+                    "v0": {"features", "label"},
+                    "v1": {"features"},
+                    "v2": {"features"},
                 },
                 "edgeCollections": {
                     "e0": {},
@@ -453,7 +485,7 @@ def test_dgl_to_adb(
         ),
     ],
 )
-def test_adb_to_pyg(
+def test_adb_to_dgl(
     adapter: ADBDGL_Adapter,
     name: str,
     metagraph: ADBMetagraph,
@@ -470,7 +502,7 @@ def test_adb_to_pyg(
         db.delete_graph(name, drop_collections=True)
 
 
-def test_adb_partial_to_pyg() -> None:
+def test_adb_partial_to_dgl() -> None:
     dgl_g = get_social_graph()
 
     name = "Social"
@@ -493,18 +525,19 @@ def test_adb_partial_to_pyg() -> None:
         "HeterogeneousTurnedHomogeneous", metagraph
     )
 
-    assert type(dgl_g_new) is DGLGraph
+    assert dgl_g_new.is_homogeneous
     assert (
         dgl_g.ndata["features"]["user"].tolist() == dgl_g_new.ndata["features"].tolist()
     )
-    assert dgl_g.ndata["label"]["user"].tolist() == dgl_g_new["label"].tolist()
+    assert dgl_g.ndata["label"]["user"].tolist() == dgl_g_new.ndata["label"].tolist()
 
-    from_nodes, to_nodes = dgl_g.edges(
-        etype=("user", "follows", "user")
-    )  # Heterogeneous
-    from_nodes_new, to_nodes_new = dgl_g_new.edges(etype=None)  # Homogeneous
+    # Grab the nodes from the Heterogeneous graph
+    from_nodes, to_nodes = dgl_g.edges(etype=("user", "follows", "user"))
+    # Grab the same nodes from the Homogeneous graph
+    from_nodes_new, to_nodes_new = dgl_g_new.edges(etype=None)
+
     assert from_nodes.tolist() == from_nodes_new.tolist()
-    assert to_nodes.tolist() == to_nodes.new.tolist()
+    assert to_nodes.tolist() == to_nodes_new.tolist()
 
     # Case 2: Partial edge collection import keeps the graph heterogeneous
     metagraph = {
@@ -522,70 +555,29 @@ def test_adb_partial_to_pyg() -> None:
     assert type(dgl_g_new) is DGLHeteroGraph
     assert set(dgl_g_new.ntypes) == {"user", "game"}
     for n_type in dgl_g_new.ntypes:
-        for k, v in dgl_g_new.nodes[n_type].items():
-            assert v.tolist() == dgl_g.nodes[n_type][k].tolist()
+        for k, v in dgl_g_new.nodes[n_type].data.items():
+            assert v.tolist() == dgl_g.nodes[n_type].data[k].tolist()
 
     for e_type in dgl_g_new.canonical_etypes:
-        for k, v in dgl_g_new.edges[e_type].items():
-            assert v.tolist() == dgl_g.edges[e_type][k].tolist()
+        for k, v in dgl_g_new.edges[e_type].data.items():
+            assert v.tolist() == dgl_g.edges[e_type].data[k].tolist()
 
     db.delete_graph(name, drop_collections=True)
 
 
-# @pytest.mark.parametrize(
-#     "adapter, name, v_cols, e_cols",
-#     [
-#         (
-#             adbdgl_adapter,
-#             "fraud-detection",
-#             {"account", "Class", "customer"},
-#             {"accountHolder", "Relationship", "transaction"},
-#         )
-#     ],
-# )
-# def test_adb_collections_to_dgl(
-#     adapter: ADBDGL_Adapter, name: str, v_cols: Set[str], e_cols: Set[str]
-# ) -> None:
-#     dgl_g = adapter.arangodb_collections_to_dgl(
-#         name,
-#         v_cols,
-#         e_cols,
-#     )
-#     assert_dgl_data(
-#         db,
-#         dgl_g,
-#         metagraph={
-#             "vertexCollections": {col: set() for col in v_cols},
-#             "edgeCollections": {col: set() for col in e_cols},
-#         },
-#     )
-
-
-# @pytest.mark.parametrize(
-#     "adapter, name",
-#     [(adbdgl_adapter, "fraud-detection")],
-# )
-# def test_adb_graph_to_dgl(adapter: ADBDGL_Adapter, name: str) -> None:
-#     arango_graph = db.graph(name)
-#     v_cols = arango_graph.vertex_collections()
-#     e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
-
-#     dgl_g: DGLGraph = adapter.arangodb_graph_to_dgl(name)
-#     assert_dgl_data(
-#         db,
-#         dgl_g,
-#         metagraph={
-#             "vertexCollections": {col: set() for col in v_cols},
-#             "edgeCollections": {col: set() for col in e_cols},
-#         },
-#     )
-
-
 @pytest.mark.parametrize(
     "adapter, name, v_cols, e_cols, dgl_g_old",
-    [(adbdgl_adapter, "Social", {"user", "game"}, {"plays"}, get_social_graph())],
+    [
+        (
+            adbdgl_adapter,
+            "SocialGraph",
+            {"user", "game"},
+            {"plays", "follows"},
+            get_social_graph(),
+        )
+    ],
 )
-def test_adb_collections_to_pyg(
+def test_adb_collections_to_dgl(
     adapter: ADBDGL_Adapter,
     name: str,
     v_cols: Set[str],
@@ -594,7 +586,7 @@ def test_adb_collections_to_pyg(
 ) -> None:
     if dgl_g_old:
         db.delete_graph(name, drop_collections=True, ignore_missing=True)
-        adapter.pyg_to_arangodb(name, dgl_g_old)
+        adapter.dgl_to_arangodb(name, dgl_g_old)
 
     dgl_g_new = adapter.arangodb_collections_to_dgl(
         name,
@@ -620,7 +612,7 @@ def test_adb_collections_to_pyg(
         (adbdgl_adapter, "Heterogeneous", get_fake_hetero_dataset()),
     ],
 )
-def test_adb_graph_to_pyg(
+def test_adb_graph_to_dgl(
     adapter: ADBDGL_Adapter, name: str, dgl_g_old: Union[DGLGraph, DGLHeteroGraph]
 ) -> None:
     if dgl_g_old:
@@ -660,43 +652,128 @@ def test_full_cycle_imdb_without_preserve_adb_keys() -> None:
         ],
     )
 
-    adb_to_pyg_metagraph: ADBMetagraph = {
+    adb_to_dgl_metagraph: ADBMetagraph = {
         "vertexCollections": {
             "Movies": {
-                "y": "Comedy",
-                "x": {
+                "label": "Comedy",
+                "features": {
                     "Action": IdentityEncoder(dtype=long),
                     "Drama": IdentityEncoder(dtype=long),
                     # etc....
                 },
             },
             "Users": {
-                "x": {
+                "features": {
                     "Age": IdentityEncoder(dtype=long),
                     "Gender": CategoricalEncoder(),
                 }
             },
         },
-        "edgeCollections": {"Ratings": {"edge_weight": "Rating"}},
+        "edgeCollections": {"Ratings": {"weight": "Rating"}},
     }
 
-    pyg_g = adbpyg_adapter.arangodb_to_pyg(name, adb_to_pyg_metagraph)
-    assert_adb_to_pyg(pyg_g, adb_to_pyg_metagraph)
+    dgl_g = adbdgl_adapter.arangodb_to_dgl(name, adb_to_dgl_metagraph)
+    assert_adb_to_dgl(dgl_g, adb_to_dgl_metagraph)
 
-    pyg_to_adb_metagraph: PyGMetagraph = {
+    dgl_to_adb_metagraph: DGLMetagraph = {
         "nodeTypes": {
             "Movies": {
-                "y": "comedy",
-                "x": ["action", "drama"],
+                "label": "comedy",
+                "features": ["action", "drama"],
             },
-            "Users": {"x": udf_users_x_tensor_to_df},
+            "Users": {"features": udf_users_features_tensor_to_df},
         },
-        "edgeTypes": {("Users", "Ratings", "Movies"): {"edge_weight": "rating"}},
+        "edgeTypes": {("Users", "Ratings", "Movies"): {"weight": "rating"}},
     }
-    adbpyg_adapter.pyg_to_arangodb(name, pyg_g, pyg_to_adb_metagraph, overwrite=True)
-    assert_pyg_to_adb(name, pyg_g, pyg_to_adb_metagraph)
+    adbdgl_adapter.dgl_to_arangodb(name, dgl_g, dgl_to_adb_metagraph, overwrite=True)
+    assert_dgl_to_adb(name, dgl_g, dgl_to_adb_metagraph)
 
     db.delete_graph(name, drop_collections=True)
+
+
+def assert_adb_to_dgl(
+    dgl_g: Union[DGLGraph, DGLHeteroGraph], metagraph: ADBMetagraph
+) -> None:
+    has_one_ntype = len(dgl_g.ntypes) == 1
+    has_one_etype = len(dgl_g.canonical_etypes) == 1
+
+    # Maps ArangoDB Vertex _keys to DGL Node ids
+    adb_map: ADBMap = defaultdict(dict)
+
+    for v_col, meta in metagraph["vertexCollections"].items():
+        n_key = None if has_one_ntype else v_col
+        collection = db.collection(v_col)
+        assert collection.count() == dgl_g.num_nodes(n_key)
+
+        df = DataFrame(collection.all())
+        adb_map[v_col] = {adb_id: dgl_id for dgl_id, adb_id in enumerate(df["_key"])}
+
+        assert_adb_to_dgl_meta(meta, df, dgl_g.nodes[n_key].data)
+
+    et_df: DataFrame
+    v_cols: List[str] = list(metagraph["vertexCollections"].keys())
+    for e_col, meta in metagraph["edgeCollections"].items():
+        collection = db.collection(e_col)
+        assert collection.count() <= dgl_g.num_edges(None)
+
+        df = DataFrame(collection.all())
+        df[["from_col", "from_key"]] = df["_from"].str.split("/", 1, True)
+        df[["to_col", "to_key"]] = df["_to"].str.split("/", 1, True)
+
+        for (from_col, to_col), count in (
+            df[["from_col", "to_col"]].value_counts().items()
+        ):
+            edge_type = (from_col, e_col, to_col)
+            if from_col not in v_cols or to_col not in v_cols:
+                continue
+
+            e_key = None if has_one_etype else edge_type
+            assert count == dgl_g.num_edges(e_key)
+
+            et_df = df[(df["from_col"] == from_col) & (df["to_col"] == to_col)]
+            from_nodes = et_df["from_key"].map(adb_map[from_col]).tolist()
+            to_nodes = et_df["to_key"].map(adb_map[to_col]).tolist()
+
+            assert from_nodes == dgl_g.edges(etype=e_key)[0].tolist()
+            assert to_nodes == dgl_g.edges(etype=e_key)[1].tolist()
+
+            assert_adb_to_dgl_meta(meta, et_df, dgl_g.edges[e_key].data)
+
+
+def assert_adb_to_dgl_meta(
+    meta: Union[Set[str], Dict[str, ADBMetagraphValues]],
+    df: DataFrame,
+    dgl_data: Union[NodeSpace, EdgeSpace],
+) -> None:
+    valid_meta: Dict[str, ADBMetagraphValues]
+    valid_meta = meta if type(meta) is dict else {m: m for m in meta}
+
+    for k, v in valid_meta.items():
+        assert k in dgl_data
+        assert type(dgl_data[k]) is Tensor
+
+        t = dgl_data[k].tolist()
+        if type(v) is str:
+            data = df[v].tolist()
+            assert len(data) == len(t)
+            assert data == t
+
+        if type(v) is dict:
+            data = []
+            for attr, encoder in v.items():
+                if encoder is None:
+                    data.append(tensor(df[attr].to_list()))
+                if callable(encoder):
+                    data.append(encoder(df[attr]))
+
+            cat_data = cat(data, dim=-1).tolist()
+            assert len(cat_data) == len(t)
+            assert cat_data == t
+
+        if callable(v):
+            data = v(df).tolist()
+            assert len(data) == len(t)
+            assert data == t
 
 
 def assert_dgl_to_adb(
@@ -745,16 +822,15 @@ def assert_dgl_to_adb(
         df = DataFrame(collection.all())
         df[["from_col", "from_key"]] = df["_from"].str.split("/", 1, True)
         df[["to_col", "to_key"]] = df["_to"].str.split("/", 1, True)
+
         et_df = df[(df["from_col"] == from_col) & (df["to_col"] == to_col)]
+        assert len(et_df) == dgl_g.num_edges(e_key)
 
-        aql = f"""
-            FOR edge IN {e_col}
-                FILTER IS_SAME_COLLECTION({from_col}, edge._from)
-                AND IS_SAME_COLLECTION({to_col}, edge._to)
-                RETURN 1
-        """
+        from_nodes = dgl_g.edges(etype=e_key)[0].tolist()
+        to_nodes = dgl_g.edges(etype=e_key)[1].tolist()
 
-        assert db.aql.execute(aql, count=True).count() == dgl_g.num_edges(e_key)
+        assert from_nodes == et_df["from_key"].astype(int).tolist()
+        assert to_nodes == et_df["to_key"].astype(int).tolist()
 
         meta = e_meta.get(e_type, {})
         assert_dgl_to_adb_meta(et_df, meta, dgl_g.edges[e_key].data, explicit_metagraph)
@@ -762,12 +838,12 @@ def assert_dgl_to_adb(
 
 def assert_dgl_to_adb_meta(
     df: DataFrame,
-    meta: Union[str, Dict[Any, DGLMetagraphValues]],
+    meta: Union[Set[str], Dict[Any, DGLMetagraphValues]],
     dgl_data: Union[NodeSpace, EdgeSpace],
     explicit_metagraph: bool,
 ) -> None:
     valid_meta: Dict[Any, DGLMetagraphValues]
-    valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
+    valid_meta = meta if type(meta) is dict else {m: m for m in meta}
 
     if explicit_metagraph:
         dgl_keys = set(valid_meta.keys())

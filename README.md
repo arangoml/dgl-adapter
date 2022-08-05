@@ -124,7 +124,7 @@ class Custom_ADBDGL_Controller(ADBDGL_Controller):
     def _prepare_dgl_node(self, dgl_node: dict, node_type: str) -> dict:
         """Optionally modify a DGL node object before it gets inserted into its designated ArangoDB collection.
 
-        :param pyg_node: The DGL node object to (optionally) modify.
+        :param dgl_node: The DGL node object to (optionally) modify.
         :param node_type: The DGL Node Type of the node.
         :return: The DGL Node object
         """

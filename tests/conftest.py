@@ -10,12 +10,12 @@ from arango.http import DefaultHTTPClient
 from dgl import DGLGraph, DGLHeteroGraph, heterograph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from pandas import DataFrame
-from torch import Tensor, ones, rand, tensor, zeros
+from torch import Tensor, rand, tensor
 
 from adbdgl_adapter import ADBDGL_Adapter, ADBDGL_Controller
 from adbdgl_adapter.typings import DGLCanonicalEType, Json
 
-con: Json = {}
+con: Json
 db: StandardDatabase
 adbdgl_adapter: ADBDGL_Adapter
 PROJECT_DIR = Path(__file__).parent.parent
@@ -29,6 +29,7 @@ def pytest_addoption(parser: Any) -> None:
 
 
 def pytest_configure(config: Any) -> None:
+    global con
     con = {
         "url": config.getoption("url"),
         "username": config.getoption("username"),
@@ -71,7 +72,7 @@ def pytest_exception_interact(node: Any, call: Any, report: Any) -> None:
         print("Could not delete graph")
 
 
-def arango_restore(path_to_data: str) -> None:
+def arango_restore(con: Json, path_to_data: str) -> None:
     restore_prefix = "./tools/" if os.getenv("GITHUB_ACTIONS") else ""
     protocol = "http+ssl://" if "https://" in con["url"] else "tcp://"
     url = protocol + con["url"].partition("://")[-1]
@@ -87,11 +88,11 @@ def arango_restore(path_to_data: str) -> None:
     )
 
 
-def get_karate_graph() -> DGLHeteroGraph:
+def get_karate_graph() -> DGLGraph:
     return KarateClubDataset()[0]
 
 
-def get_hypercube_graph() -> DGLHeteroGraph:
+def get_hypercube_graph() -> DGLGraph:
     dgl_g = remove_self_loop(MiniGCDataset(8, 8, 9)[4][0])
     dgl_g.ndata["node_features"] = rand(dgl_g.num_nodes())
     dgl_g.edata["edge_features"] = tensor(
@@ -162,7 +163,7 @@ def udf_key_df_to_tensor(key: str) -> Callable[[DataFrame], Tensor]:
     return f
 
 
-def label_tensor_to_2_column_dataframe(dgl_tensor: Tensor):
+def label_tensor_to_2_column_dataframe(dgl_tensor: Tensor) -> DataFrame:
     label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
 
     df = DataFrame(columns=["label_num", "label_str"])

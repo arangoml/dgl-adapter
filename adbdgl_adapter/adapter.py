@@ -109,7 +109,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             and len(metagraph["edgeCollections"]) == 1
         )
 
-        # Maps ArangoDB Vertex _keys to PyG Node ids
+        # Maps ArangoDB Vertex _keys to DGL Node ids
         adb_map: ADBMap = defaultdict(dict)
 
         # The data for constructing a graph,
@@ -162,7 +162,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 data_dict[edge_type] = (tensor(from_nodes), tensor(to_nodes))
                 self.__set_dgl_data(edge_type, meta, edata, df)
 
-        if not data_dict:
+        if not data_dict: # pragma: no cover
             msg = f"""
                 Can't create DGL graph: no complete edge types found.
                 The following edge types were skipped due to missing
@@ -262,7 +262,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type metagraph: adbdgl_adapter.typings.DGLMetagraph
         :param explicit_metagraph: Whether to take the metagraph at face value or not.
             If False, node & edge types OMITTED from the metagraph will be
-            brought over into ArangoDB. Defaults to True.
+            brought over into ArangoDB. Also applies to node & edge attributes.
+            Defaults to True.
         :type explicit_metagraph: bool
         :param overwrite_graph: Overwrites the graph if it already exists.
             Does not drop associated collections. Defaults to False.
@@ -512,7 +513,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type df: pandas.DataFrame
         """
         valid_meta: Dict[str, ADBMetagraphValues]
-        valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
+        valid_meta = meta if type(meta) is dict else {m: m for m in meta}
 
         for k, v in valid_meta.items():
             dgl_data[k][data_type] = self.__build_tensor_from_dataframe(df, k, v)
@@ -559,24 +560,24 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             the vertex/edge _id or _key attribute.
         :type df: pandas.DataFrame
         :param meta: The metagraph associated to the
-            current PyG node or edge type. e.g metagraph['nodeTypes']['v0']
+            current DGL node or edge type. e.g metagraph['nodeTypes']['v0']
         :type meta: Set[str] | Dict[Any, adbdgl_adapter.typings.DGLMetagraphValues]
         :param dgl_data: The NodeSpace or EdgeSpace of the current
             DGL node or edge type.
-        :type pyg_data: dgl.view.(NodeSpace | EdgeSpace)
+        :type dgl_data: dgl.view.(NodeSpace | EdgeSpace)
         :param explicit_metagraph: The value of **explicit_metagraph**
-            in **pyg_to_arangodb**.
+            in **dgl_to_arangodb**.
         :type explicit_metagraph: bool
         :return: The completed DataFrame for the (soon-to-be) ArangoDB collection.
         :rtype: pandas.DataFrame
-        :raise ValueError: If an unsupported PyG data value is found.
+        :raise ValueError: If an unsupported DGL data value is found.
         """
         logger.debug(
             f"__set_adb_data(df, {meta}, {type(dgl_data)}, {explicit_metagraph}"
         )
 
         valid_meta: Dict[Any, DGLMetagraphValues]
-        valid_meta = meta if type(meta) is dict else {m: m for m in meta}   
+        valid_meta = meta if type(meta) is dict else {m: m for m in meta}
 
         if explicit_metagraph:
             dgl_keys = set(valid_meta.keys())
