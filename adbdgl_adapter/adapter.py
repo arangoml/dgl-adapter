@@ -162,7 +162,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 data_dict[edge_type] = (tensor(from_nodes), tensor(to_nodes))
                 self.__set_dgl_data(edge_type, meta, edata, df)
 
-        if not data_dict: # pragma: no cover
+        if not data_dict:  # pragma: no cover
             msg = f"""
                 Can't create DGL graph: no complete edge types found.
                 The following edge types were skipped due to missing
