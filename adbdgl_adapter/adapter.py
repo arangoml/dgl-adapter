@@ -19,11 +19,11 @@ from .typings import (
     ADBMetagraph,
     ADBMetagraphValues,
     DGLCanonicalEType,
+    DGLData,
     DGLDataDict,
-    DGLEData,
+    DGLDataTypes,
     DGLMetagraph,
     DGLMetagraphValues,
-    DGLNData,
     Json,
 )
 from .utils import logger, progress, validate_adb_metagraph, validate_dgl_metagraph
@@ -118,10 +118,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         data_dict: DGLDataDict = dict()
 
         # The node data view for storing node features
-        ndata: DGLNData = defaultdict(lambda: defaultdict())
+        ndata: DGLData = defaultdict(lambda: defaultdict())
 
         # The edge data view for storing edge features
-        edata: DGLEData = defaultdict(lambda: defaultdict())
+        edata: DGLData = defaultdict(lambda: defaultdict())
 
         for v_col, meta in metagraph["vertexCollections"].items():
             logger.debug(f"Preparing '{v_col}' vertices")
@@ -131,8 +131,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 adb_id: dgl_id for dgl_id, adb_id in enumerate(df["_key"])
             }
 
-            for k, v in meta.items():
-                ndata[k][v_col] = self.__build_tensor_from_dataframe(df, k, v)
+            self.__set_dgl_data(v_col, meta, ndata, df)
 
         et_df: DataFrame
         et_blacklist: List[DGLCanonicalEType] = []  # A list of skipped edge types
@@ -161,10 +160,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 to_nodes = et_df["to_key"].map(adb_map[to_col]).tolist()
 
                 data_dict[edge_type] = (tensor(from_nodes), tensor(to_nodes))
-                for k, v in meta.items():
-                    edata[k][edge_type] = self.__build_tensor_from_dataframe(
-                        et_df, k, v
-                    )
+                self.__set_dgl_data(edge_type, meta, edata, df)
 
         if not data_dict:
             msg = f"""
@@ -186,8 +182,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.canonical_etypes) == 1
 
-        self.__set_dgl_data(dgl_g.ndata, ndata, has_one_ntype)
-        self.__set_dgl_data(dgl_g.edata, edata, has_one_etype)
+        self.__copy_dgl_data(dgl_g.ndata, ndata, has_one_ntype)
+        self.__copy_dgl_data(dgl_g.edata, edata, has_one_etype)
 
         logger.info(f"Created DGL '{name}' Graph")
         return dgl_g
@@ -287,7 +283,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.canonical_etypes) == 1
-        has_default_canonical_etypes = dgl_g.canonical_etypes == ["_N", "_E", "_N"]
+        has_default_canonical_etypes = dgl_g.canonical_etypes == [("_N", "_E", "_N")]
 
         node_types: List[str]
         edge_types: List[DGLCanonicalEType]
@@ -494,8 +490,42 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
     def __set_dgl_data(
         self,
+        data_type: DGLDataTypes,
+        meta: Union[Set[str], Dict[str, ADBMetagraphValues]],
+        dgl_data: DGLData,
+        df: DataFrame,
+    ) -> None:
+        """A helper method to build the DGL NodeStorage or EdgeStorage object
+        for the DGL graph. Is responsible for preparing the input **meta** such
+        that it becomes a dictionary, and building DGL-ready tensors from the
+        ArangoDB DataFrame **df**.
+
+        :param data_type: The current node or edge type of the soon-to-be DGL graph.
+        :type data_type: str | tuple[str, str, str]
+        :param meta: The metagraph associated to the current ArangoDB vertex or
+            edge collection. e.g metagraph['vertexCollections']['Users']
+        :type meta: Set[str] |  Dict[str, adbdgl_adapter.typings.ADBMetagraphValues]
+        :param dgl_data: The (currently empty) DefaultDict object storing the node or
+            edge features of the soon-to-be DGL graph.
+        :type dgl_data: adbdgl_adapter.typings.DGLData
+        :param df: The DataFrame representing the ArangoDB collection data
+        :type df: pandas.DataFrame
+        """
+        valid_meta: Dict[str, ADBMetagraphValues]
+
+        if type(meta) is dict:
+            valid_meta = meta
+
+        if type(meta) is set:
+            valid_meta = {m: m for m in meta}
+
+        for k, v in valid_meta.items():
+            dgl_data[k][data_type] = self.__build_tensor_from_dataframe(df, k, v)
+
+    def __copy_dgl_data(
+        self,
         dgl_data: Union[HeteroNodeDataView, HeteroEdgeDataView],
-        dgl_data_temp: Union[DGLNData, DGLEData],
+        dgl_data_temp: DGLData,
         has_one_type: bool,
     ) -> None:
         """Copies **dgl_data_temp** into **dgl_data**. This method is (unfortunately)
@@ -506,7 +536,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             which is about to receive **dgl_data_temp**.
         :type dgl_data: Union[dgl.view.HeteroNodeDataView, dgl.view.HeteroEdgeDataView]
         :param dgl_data_temp: A temporary place to store the ndata or edata features.
-        :type dgl_data_temp: adbdgl_adapter.typings.(DGLNData | DGLEData)
+        :type dgl_data_temp: adbdgl_adapter.typings.DGLData
         :param has_one_type: Set to True if the DGL graph only has one
             node type or edge type.
         :type has_one_type: bool
@@ -520,7 +550,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     def __set_adb_data(
         self,
         df: DataFrame,
-        meta: Dict[Any, DGLMetagraphValues],
+        meta: Union[Set[str], Dict[Any, DGLMetagraphValues]],
         dgl_data: Union[NodeSpace, EdgeSpace],
         explicit_metagraph: bool,
     ) -> DataFrame:
@@ -535,7 +565,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type df: pandas.DataFrame
         :param meta: The metagraph associated to the
             current PyG node or edge type. e.g metagraph['nodeTypes']['v0']
-        :type meta: Dict[Any, adbdgl_adapter.typings.DGLMetagraphValues]
+        :type meta: Set[str] | Dict[Any, adbdgl_adapter.typings.DGLMetagraphValues]
         :param dgl_data: The NodeSpace or EdgeSpace of the current
             DGL node or edge type.
         :type pyg_data: dgl.view.(NodeSpace | EdgeSpace)
@@ -550,14 +580,22 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             f"__set_adb_data(df, {meta}, {type(dgl_data)}, {explicit_metagraph}"
         )
 
+        valid_meta: Dict[Any, DGLMetagraphValues]
+
+        if type(meta) is dict:
+            valid_meta = meta
+
+        if type(meta) is set:
+            valid_meta = {m: m for m in meta}
+
         if explicit_metagraph:
-            dgl_keys = set(meta.keys())
+            dgl_keys = set(valid_meta.keys())
         else:
             dgl_keys = dgl_data.keys()
 
         for k in dgl_keys:
             data = dgl_data[k]
-            meta_val = meta.get(k, str(k))
+            meta_val = valid_meta.get(k, str(k))
 
             if type(data) is Tensor and len(data) == len(df):
                 df = df.join(self.__build_dataframe_from_tensor(data, k, meta_val))
@@ -642,10 +680,22 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             f"__build_dataframe_from_tensor(df, '{meta_key}', {type(meta_val)})"
         )
 
-        if type(meta_val) in [str, list]:
-            columns = [meta_val] if type(meta_val) is str else meta_val
+        if type(meta_val) is str:
+            df = DataFrame(columns=[meta_val])
+            df[meta_val] = dgl_tensor.tolist()
+            return df
 
-            df = DataFrame(columns=columns)
+        if type(meta_val) is list:
+            num_features = dgl_tensor.size()[-1]
+            if len(meta_val) != num_features:  # pragma: no cover
+                msg = f"""
+                    Invalid list length for **meta_val** ('{meta_key}'):
+                    List length must match the number of
+                    features found in the tensor ({num_features}).
+                """
+                raise DGLMetagraphError(msg)
+
+            df = DataFrame(columns=meta_val)
             df[meta_val] = dgl_tensor.tolist()
             return df
 

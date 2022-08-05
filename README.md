@@ -209,9 +209,7 @@ metagraph_v3 = {
     "vertexCollections": {
         "user": {
             "features": udf_user_features,  # supports named functions
-            "label": lambda df: torch.tensor(
-                df["label"].to_list()
-            ),  # also supports lambda functions
+            "label": lambda df: torch.tensor(df["label"].to_list()),  # also supports lambda functions
         },
         "game": {"features": udf_game_features},
     },
