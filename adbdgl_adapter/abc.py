@@ -46,21 +46,6 @@ class Abstract_ADBDGL_Adapter(ABC):
     ) -> List[str]:
         raise NotImplementedError  # pragma: no cover
 
-    # def __prepare_dgl_features(self) -> None:
-    #     raise NotImplementedError  # pragma: no cover
-
-    # def __insert_dgl_features(self) -> None:
-    #     raise NotImplementedError  # pragma: no cover
-
-    # def __prepare_adb_attributes(self) -> None:
-    #     raise NotImplementedError  # pragma: no cover
-
-    # def __fetch_adb_docs(self) -> None:
-    #     raise NotImplementedError  # pragma: no cover
-
-    # def __insert_adb_docs(self) -> None:
-    #     raise NotImplementedError  # pragma: no cover
-
     def __fetch_adb_docs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 

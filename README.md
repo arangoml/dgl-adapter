@@ -157,6 +157,7 @@ dgl_g = adbdgl_adapter.arangodb_graph_to_dgl("FakeHetero")
 dgl_g = adbdgl_adapter.arangodb_collections_to_dgl("FakeHetero", v_cols={"user", "game"}, e_cols={"plays"})
 
 # 2.3: ArangoDB to DGL via Metagraph v1 (transfer attributes "as is", meaning they are already formatted to DGL data standards)
+# Learn more about the DGL Data Standards here: https://docs.dgl.ai/guide/graph.html#guide-graph
 metagraph_v1 = {
     "vertexCollections": {
         # Move the "features" & "label" ArangoDB attributes to DGL as "features" & "label" Tensors
