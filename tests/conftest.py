@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict
 
 from arango import ArangoClient
 from arango.database import StandardDatabase
-from arango.http import DefaultHTTPClient
 from dgl import DGLGraph, DGLHeteroGraph, heterograph, remove_self_loop
 from dgl.data import KarateClubDataset, MiniGCDataset
 from pandas import DataFrame
@@ -44,11 +43,8 @@ def pytest_configure(config: Any) -> None:
     print("Database: " + con["dbName"])
     print("----------------------------------------")
 
-    class NoTimeoutHTTPClient(DefaultHTTPClient):  # type: ignore
-        REQUEST_TIMEOUT = None
-
     global db
-    db = ArangoClient(hosts=con["url"], http_client=NoTimeoutHTTPClient()).db(
+    db = ArangoClient(hosts=con["url"]).db(
         con["dbName"], con["username"], con["password"], verify=True
     )
 
@@ -143,11 +139,10 @@ def get_social_graph() -> DGLHeteroGraph:
 
 
 # For DGL to ArangoDB testing purposes
-def udf_users_features_tensor_to_df(t: Tensor) -> DataFrame:
-    df = DataFrame(columns=["age", "gender"])
-    df[["age", "gender"]] = t.tolist()
-    df["gender"] = df["gender"].map({0: "Male", 1: "Female"})
-    return df
+def udf_users_features_tensor_to_df(t: Tensor, adb_df: DataFrame) -> DataFrame:
+    adb_df[["age", "gender"]] = t.tolist()
+    adb_df["gender"] = adb_df["gender"].map({0: "Male", 1: "Female"})
+    return adb_df
 
 
 # For ArangoDB to DGL testing purposes
@@ -163,10 +158,9 @@ def udf_key_df_to_tensor(key: str) -> Callable[[DataFrame], Tensor]:
     return f
 
 
-def label_tensor_to_2_column_dataframe(dgl_tensor: Tensor) -> DataFrame:
+def label_tensor_to_2_column_dataframe(dgl_tensor: Tensor, df: DataFrame) -> DataFrame:
     label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
 
-    df = DataFrame(columns=["label_num", "label_str"])
     df["label_num"] = dgl_tensor.tolist()
     df["label_str"] = df["label_num"].map(label_map)
 

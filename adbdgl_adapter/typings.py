@@ -6,6 +6,8 @@ __all__ = [
     "DGLMetagraphValues",
     "DGLCanonicalEType",
     "DGLDataDict",
+    "ADBMap",
+    "DGLMap",
 ]
 
 from typing import Any, Callable, DefaultDict, Dict, List, Set, Tuple, Union
@@ -16,7 +18,7 @@ from torch import Tensor
 Json = Dict[str, Any]
 
 DataFrameToTensor = Callable[[DataFrame], Tensor]
-TensorToDataFrame = Callable[[Tensor], DataFrame]
+TensorToDataFrame = Callable[[Tensor, DataFrame], DataFrame]
 
 ADBEncoders = Dict[str, DataFrameToTensor]
 ADBMetagraphValues = Union[str, DataFrameToTensor, ADBEncoders]

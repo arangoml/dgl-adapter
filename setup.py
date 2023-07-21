@@ -11,7 +11,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/arangoml/dgl-adapter",
-    keywords=["arangodb", "dgl", "adapter"],
+    keywords=["arangodb", "dgl", "deep graph library", "adapter"],
     packages=["adbdgl_adapter"],
     include_package_data=True,
     python_requires=">=3.7",
@@ -27,10 +27,10 @@ setup(
     ],
     extras_require={
         "dev": [
-            "black",
-            "flake8>=3.8.0",
-            "isort>=5.0.0",
-            "mypy>=0.790",
+            "black==23.3.0",
+            "flake8==6.0.0",
+            "isort==5.12.0",
+            "mypy==1.4.1",
             "pytest>=6.0.0",
             "pytest-cov>=2.0.0",
             "coveralls>=3.3.1",

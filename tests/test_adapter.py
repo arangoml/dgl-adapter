@@ -44,7 +44,7 @@ def test_validate_constructor() -> None:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(bad_db)
+        ADBDGL_Adapter(bad_db)  # type: ignore
 
     with pytest.raises(TypeError):
         ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore
@@ -237,15 +237,16 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
 
 @pytest.mark.parametrize(
     "adapter, name, dgl_g, metagraph, \
-        explicit_metagraph, overwrite_graph, import_options",
+        explicit_metagraph, overwrite_graph, batch_size, import_options",
     [
         (
             adbdgl_adapter,
-            "Karate_2",
+            "Karate_1",
             get_karate_graph(),
             {"nodeTypes": {"Karate_1_N": {"label": "node_label"}}},
             False,
             False,
+            33,
             {},
         ),
         (
@@ -255,6 +256,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             {"nodeTypes": {"Karate_2_N": {}}},
             True,
             False,
+            1000,
             {},
         ),
         (
@@ -277,6 +279,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             },
             True,
             False,
+            1,
             {},
         ),
         (
@@ -292,6 +295,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             },
             True,
             False,
+            1000,
             {},
         ),
         (
@@ -301,6 +305,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             {},
             False,
             False,
+            None,
             {},
         ),
         (
@@ -315,6 +320,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             },
             True,
             False,
+            None,
             {},
         ),
         (
@@ -324,6 +330,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             {},
             False,
             False,
+            None,
             {},
         ),
         (
@@ -336,6 +343,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
             },
             True,
             True,
+            None,
             {},
         ),
     ],
@@ -347,28 +355,35 @@ def test_dgl_to_adb(
     metagraph: DGLMetagraph,
     explicit_metagraph: bool,
     overwrite_graph: bool,
+    batch_size: Optional[int],
     import_options: Any,
 ) -> None:
     db.delete_graph(name, drop_collections=True, ignore_missing=True)
     adapter.dgl_to_arangodb(
-        name, dgl_g, metagraph, explicit_metagraph, overwrite_graph, **import_options
+        name,
+        dgl_g,
+        metagraph,
+        explicit_metagraph,
+        overwrite_graph,
+        batch_size,
+        **import_options
     )
     assert_dgl_to_adb(name, dgl_g, metagraph, explicit_metagraph)
     db.delete_graph(name, drop_collections=True)
 
 
-def test_dgl_to_arangodb_with_controller() -> None:
+def test_dgl_to_adb_with_controller() -> None:
     name = "Karate_3"
     data = get_karate_graph()
     db.delete_graph(name, drop_collections=True, ignore_missing=True)
 
     ADBDGL_Adapter(db, Custom_ADBDGL_Controller()).dgl_to_arangodb(name, data)
 
-    for doc in db.collection(name + "_N"):
+    for doc in db.collection(name + "_N"):  # type: ignore
         assert "foo" in doc
         assert doc["foo"] == "bar"
 
-    for edge in db.collection(name + "_E"):
+    for edge in db.collection(name + "_E"):  # type: ignore
         assert "bar" in edge
         assert edge["bar"] == "foo"
 
@@ -376,7 +391,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
 
 
 @pytest.mark.parametrize(
-    "adapter, name, metagraph, dgl_g_old",
+    "adapter, name, metagraph, dgl_g_old, batch_size",
     [
         (
             adbdgl_adapter,
@@ -390,6 +405,21 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_karate_graph(),
+            1,
+        ),
+        (
+            adbdgl_adapter,
+            "Karate_2",
+            {
+                "vertexCollections": {
+                    "Karate_2_N": {"karate_label": "label"},
+                },
+                "edgeCollections": {
+                    "Karate_2_E": {},
+                },
+            },
+            get_karate_graph(),
+            33,
         ),
         (
             adbdgl_adapter,
@@ -403,6 +433,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_hypercube_graph(),
+            1000,
         ),
         (
             adbdgl_adapter,
@@ -419,6 +450,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_social_graph(),
+            1,
         ),
         (
             adbdgl_adapter,
@@ -434,6 +466,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_fake_hetero_dataset(),
+            1000,
         ),
         (
             adbdgl_adapter,
@@ -449,6 +482,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_fake_hetero_dataset(),
+            None,
         ),
         (
             adbdgl_adapter,
@@ -464,6 +498,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_fake_hetero_dataset(),
+            None,
         ),
         (
             adbdgl_adapter,
@@ -482,6 +517,7 @@ def test_dgl_to_arangodb_with_controller() -> None:
                 },
             },
             get_fake_hetero_dataset(),
+            None,
         ),
     ],
 )
@@ -490,12 +526,13 @@ def test_adb_to_dgl(
     name: str,
     metagraph: ADBMetagraph,
     dgl_g_old: Optional[Union[DGLGraph, DGLHeteroGraph]],
+    batch_size: Optional[None],
 ) -> None:
     if dgl_g_old:
         db.delete_graph(name, drop_collections=True, ignore_missing=True)
         adapter.dgl_to_arangodb(name, dgl_g_old)
 
-    dgl_g_new = adapter.arangodb_to_dgl(name, metagraph)
+    dgl_g_new = adapter.arangodb_to_dgl(name, metagraph, batch_size=batch_size)
     assert_adb_to_dgl(dgl_g_new, metagraph)
 
     if dgl_g_old:
@@ -621,9 +658,10 @@ def test_adb_graph_to_dgl(
 
     dgl_g_new = adapter.arangodb_graph_to_dgl(name)
 
-    arango_graph = db.graph(name)
-    v_cols = arango_graph.vertex_collections()
-    e_cols = {col["edge_collection"] for col in arango_graph.edge_definitions()}
+    graph = db.graph(name)
+    v_cols: Set[str] = graph.vertex_collections()  # type: ignore
+    edge_definitions: List[Dict[str, Any]] = graph.edge_definitions()  # type: ignore
+    e_cols: Set[str] = {c["edge_collection"] for c in edge_definitions}
 
     assert_adb_to_dgl(
         dgl_g_new,
@@ -637,7 +675,7 @@ def test_adb_graph_to_dgl(
         db.delete_graph(name, drop_collections=True)
 
 
-def test_full_cycle_imdb_without_preserve_adb_keys() -> None:
+def test_full_cycle_imdb() -> None:
     name = "imdb"
     db.delete_graph(name, drop_collections=True, ignore_missing=True)
     arango_restore(con, "tests/data/adb/imdb_dump")
@@ -717,8 +755,8 @@ def assert_adb_to_dgl(
         assert collection.count() <= dgl_g.num_edges(None)
 
         df = DataFrame(collection.all())
-        df[["from_col", "from_key"]] = df["_from"].str.split("/", 1, True)
-        df[["to_col", "to_key"]] = df["_to"].str.split("/", 1, True)
+        df[["from_col", "from_key"]] = df["_from"].str.split(pat="/", n=1, expand=True)
+        df[["to_col", "to_key"]] = df["_to"].str.split(pat="/", n=1, expand=True)
 
         for (from_col, to_col), count in (
             df[["from_col", "to_col"]].value_counts().items()
@@ -782,7 +820,6 @@ def assert_dgl_to_adb(
     metagraph: DGLMetagraph,
     explicit_metagraph: bool = False,
 ) -> None:
-
     has_one_ntype = len(dgl_g.ntypes) == 1
     has_one_etype = len(dgl_g.canonical_etypes) == 1
     has_default_canonical_etypes = dgl_g.canonical_etypes == [("_N", "_E", "_N")]
@@ -820,8 +857,8 @@ def assert_dgl_to_adb(
         collection = db.collection(e_col)
 
         df = DataFrame(collection.all())
-        df[["from_col", "from_key"]] = df["_from"].str.split("/", 1, True)
-        df[["to_col", "to_key"]] = df["_to"].str.split("/", 1, True)
+        df[["from_col", "from_key"]] = df["_from"].str.split(pat="/", n=1, expand=True)
+        df[["to_col", "to_key"]] = df["_to"].str.split(pat="/", n=1, expand=True)
 
         et_df = df[(df["from_col"] == from_col) & (df["to_col"] == to_col)]
         assert len(et_df) == dgl_g.num_edges(e_key)
@@ -866,7 +903,7 @@ def assert_dgl_to_adb_meta(
                 assert df[meta_val].values.tolist() == data.tolist()
 
             if callable(meta_val):
-                udf_df = meta_val(data)
+                udf_df = meta_val(data, DataFrame(index=range(len(data))))
                 assert all([column in df for column in udf_df.columns])
                 for column in udf_df.columns:
                     assert df[column].tolist() == udf_df[column].tolist()

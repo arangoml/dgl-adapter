@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/github/license/arangoml/dgl-adapter?color=9E2165&style=for-the-badge)](https://github.com/arangoml/dgl-adapter/blob/master/LICENSE)
 [![Code style: black](https://img.shields.io/static/v1?style=for-the-badge&label=code%20style&message=black&color=black)](https://github.com/psf/black)
-[![Downloads](https://img.shields.io/badge/dynamic/json?style=for-the-badge&color=282661&label=Downloads&query=total_downloads&url=https://api.pepy.tech/api/projects/adbdgl-adapter)](https://pepy.tech/project/adbdgl-adapter)
+[![Downloads](https://img.shields.io/badge/dynamic/json?style=for-the-badge&color=282661&label=Downloads&query=total_downloads&url=https://api.pepy.tech/api/v2/projects/adbdgl-adapter)](https://pepy.tech/project/adbdgl-adapter)
 
 
 <a href="https://www.arangodb.com/" rel="arangodb.com">![](https://raw.githubusercontent.com/arangoml/dgl-adapter/master/examples/assets/adb_logo.png)</a>
@@ -76,20 +76,25 @@ adbdgl_adapter = ADBDGL_Adapter(db)
 adb_g = adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero)
 
 # 1.2: DGL to ArangoDB with a (completely optional) metagraph for customized adapter behaviour
-def label_tensor_to_2_column_dataframe(dgl_tensor):
+def label_tensor_to_2_column_dataframe(dgl_tensor, adb_df):
     """
     A user-defined function to create two
     ArangoDB attributes out of the 'user' label tensor
 
-    NOTE: user-defined functions must return a Pandas Dataframe
+    :param dgl_tensor: The DGL Tensor containing the data
+    :type dgl_tensor: torch.Tensor
+    :param adb_df: The ArangoDB DataFrame to populate, whose
+        size is preset to the length of **dgl_tensor**.
+    :type adb_df: pandas.DataFrame
+
+    NOTE: user-defined functions must return the modified **adb_df**
     """
     label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
 
-    df = pandas.DataFrame(columns=["label_num", "label_str"])
-    df["label_num"] = dgl_tensor.tolist()
-    df["label_str"] = df["label_num"].map(label_map)
+    adb_df["label_num"] = dgl_tensor.tolist()
+    adb_df["label_str"] = adb_df["label_num"].map(label_map)
 
-    return df
+    return adb_df
 
 
 metagraph = {
