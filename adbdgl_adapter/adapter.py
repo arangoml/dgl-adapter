@@ -999,14 +999,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             empty_df = DataFrame(index=range(start_index, end_index))
             user_defined_result = meta_val(dgl_tensor, empty_df)
 
-            if type(user_defined_result) is not DataFrame:  # pragma: no cover
-                msg = f"Invalid return type for function {meta_val} ('{meta_key}')"
+            if not isinstance(user_defined_result, DataFrame):  # pragma: no cover
+                msg = f"""
+                    Invalid return type for function {meta_val} ('{meta_key}').
+                    Function must return Pandas DataFrame.
+                """
                 raise DGLMetagraphError(msg)
 
-            if len(user_defined_result) != (end_index - start_index):
+            if (
+                user_defined_result.index.start != start_index
+                or user_defined_result.index.stop != end_index
+            ):  # pragma: no cover
                 msg = f"""
                     User Defined Function {meta_val} ('{meta_key}') must return
-                    DataFrame of size equivalent to {end_index - start_index}
+                    DataFrame with start index {start_index} & stop index {end_index}
                 """
                 raise DGLMetagraphError(msg)
 
