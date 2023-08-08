@@ -22,7 +22,7 @@ setup(
         "pandas>=1.3.5",
         "dgl>=0.6.1",
         "torch>=1.12.0",
-        "python-arango>=7.4.1",
+        "python-arango==7.6.0",
         "setuptools>=45",
     ],
     extras_require={
