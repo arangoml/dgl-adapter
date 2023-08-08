@@ -730,8 +730,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         with progress(
             f"(ADB → DGL): {col}",
-            text_style="#8929C2",
-            spinner_style="#40A6F5",
+            text_style="#319BF5",
+            spinner_style="#FCFDFC",
         ) as p:
             p.add_task("__fetch_adb_docs")
             return self.__db.aql.execute(  # type: ignore
