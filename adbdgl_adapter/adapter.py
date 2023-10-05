@@ -645,6 +645,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         logger.debug(f"--dgl_to_arangodb('{name}')--")
 
         validate_dgl_metagraph(metagraph)
+        explicit_metagraph = metagraph != {} and explicit_metagraph
 
         is_custom_controller = type(self.__cntrl) is not ADBDGL_Controller
         has_one_ntype = len(dgl_g.ntypes) == 1
@@ -793,7 +794,6 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         node_types: List[str]
         edge_types: List[DGLCanonicalEType]
 
-        explicit_metagraph = metagraph != {} and explicit_metagraph
         has_default_canonical_etypes = dgl_g.canonical_etypes == [("_N", "_E", "_N")]
 
         if explicit_metagraph:
