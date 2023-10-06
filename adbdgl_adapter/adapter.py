@@ -337,8 +337,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             raise ValueError(msg)
 
         dgl_g = self.__create_dgl_graph(data_dict, adb_map, metagraph)
-        self.__copy_dgl_data(dgl_g.ndata, ndata, len(dgl_g.ntypes) == 1)
-        self.__copy_dgl_data(dgl_g.edata, edata, len(dgl_g.canonical_etypes) == 1)
+        self.__link_dgl_data(dgl_g.ndata, ndata, len(dgl_g.ntypes) == 1)
+        self.__link_dgl_data(dgl_g.edata, edata, len(dgl_g.canonical_etypes) == 1)
 
         logger.info(f"Created DGL '{name}' Graph")
         return dgl_g
@@ -495,14 +495,15 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         logger.debug(f"--dgl_to_arangodb('{name}')--")
 
         validate_dgl_metagraph(metagraph)
-        explicit_metagraph = metagraph != {} and explicit_metagraph
 
+        is_explicit_metagraph = metagraph != {} and explicit_metagraph
         is_custom_controller = type(self.__cntrl) is not ADBDGL_Controller
+
         has_one_ntype = len(dgl_g.ntypes) == 1
         has_one_etype = len(dgl_g.canonical_etypes) == 1
 
         node_types, edge_types = self.__get_node_and_edge_types(
-            name, dgl_g, metagraph, explicit_metagraph
+            name, dgl_g, metagraph, is_explicit_metagraph
         )
 
         adb_graph = self.__create_adb_graph(
@@ -539,7 +540,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     ndata_size,
                     start_index,
                     end_index,
-                    explicit_metagraph,
+                    is_explicit_metagraph,
                 )
 
                 # 3. Apply the ArangoDB Node Controller (if provided)
@@ -596,7 +597,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                     edata_size,
                     start_index,
                     end_index,
-                    explicit_metagraph,
+                    is_explicit_metagraph,
                 )
 
                 df["_from"] = from_col + "/" + df["_from"].astype(str)
@@ -690,7 +691,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         name: str,
         dgl_g: DGLGraph,
         metagraph: DGLMetagraph,
-        explicit_metagraph: bool,
+        is_explicit_metagraph: bool,
     ) -> Tuple[List[str], List[DGLCanonicalEType]]:
         """Returns the node & edge types of the DGL graph, based on the
             metagraph and whether the graph has default canonical etypes.
@@ -701,11 +702,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type dgl_g: dgl.DGLGraph
         :param metagraph: The DGL Metagraph.
         :type metagraph: adbdgl_adapter.typings.DGLMetagraph
-        :param explicit_metagraph: Whether to take the metagraph at face value or not.
-            If False, node & edge types OMITTED from the metagraph will be
-            brought over into ArangoDB. Also applies to node & edge attributes.
-            Defaults to True.
-        :type explicit_metagraph: bool
+        :param is_explicit_metagraph: Take the metagraph at face value or not.
+        :type is_explicit_metagraph: bool
         :return: The node & edge types of the DGL graph.
         :rtype: Tuple[List[str], List[adbdgl_adapter.typings.DGLCanonicalEType]]
         """
@@ -714,7 +712,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         has_default_canonical_etypes = dgl_g.canonical_etypes == [("_N", "_E", "_N")]
 
-        if explicit_metagraph:
+        if is_explicit_metagraph:
             node_types = metagraph.get("nodeTypes", {}).keys()  # type: ignore
             edge_types = metagraph.get("edgeTypes", {}).keys()  # type: ignore
 
@@ -919,13 +917,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             t = self.__build_tensor_from_dataframe(df, k, v)
             dgl_data[k][data_type] = cat((dgl_data[k][data_type], t))
 
-    def __copy_dgl_data(
+    def __link_dgl_data(
         self,
         dgl_data: Union[HeteroNodeDataView, HeteroEdgeDataView],
         dgl_data_temp: DGLData,
         has_one_type: bool,
     ) -> None:
-        """Copies **dgl_data_temp** into **dgl_data**. This method is (unfortunately)
+        """Links **dgl_data_temp** to **dgl_data**. This method is (unfortunately)
             required, since a dgl graph's `ndata` and `edata` properties can't be
             manually set (i.e `g.ndata = ndata` is not possible).
 
@@ -952,7 +950,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         dgl_data_size: int,
         start_index: int,
         end_index: int,
-        explicit_metagraph: bool,
+        is_explicit_metagraph: bool,
     ) -> DataFrame:
         """A helper method to build the ArangoDB Dataframe for the given
         collection. Is responsible for creating "sub-DataFrames" from DGL tensors,
@@ -976,25 +974,20 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type start_index: int
         :param end_index: The ending index of the current batch to process.
         :type end_index: int
-        :param explicit_metagraph: The value of **explicit_metagraph**
-            in **dgl_to_arangodb**.
-        :type explicit_metagraph: bool
+        :param is_explicit_metagraph: Take the metagraph at face value or not.
+        :type is_explicit_metagraph: bool
         :return: The completed DataFrame for the (soon-to-be) ArangoDB collection.
         :rtype: pandas.DataFrame
         :raise ValueError: If an unsupported DGL data value is found.
         """
         logger.debug(
-            f"__set_adb_data(df, {meta}, {type(dgl_data)}, {explicit_metagraph}"
+            f"__set_adb_data(df, {meta}, {type(dgl_data)}, {is_explicit_metagraph}"
         )
 
         valid_meta: Dict[Any, DGLMetagraphValues]
         valid_meta = meta if type(meta) is dict else {m: m for m in meta}
 
-        if explicit_metagraph:
-            dgl_keys = set(valid_meta.keys())
-        else:
-            dgl_keys = dgl_data.keys()
-
+        dgl_keys = set(valid_meta.keys()) if is_explicit_metagraph else dgl_data.keys()
         for meta_key in dgl_keys:
             data = dgl_data[meta_key]
             meta_val = valid_meta.get(meta_key, str(meta_key))
