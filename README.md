@@ -18,6 +18,7 @@
 
 The ArangoDB-DGL Adapter exports Graphs from ArangoDB, the multi-model database for graph & beyond, into Deep Graph Library (DGL), a python package for graph neural networks, and vice-versa.
 
+Note: The ArangoDB-DGL Adapter currently only supports the use of PyTorch as the [DGL backend](https://docs.dgl.ai/en/0.8.x/install/#backends). Support for MXNet and Tensorflow will be added in the future.
 
 ## About DGL
 
