@@ -330,7 +330,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
         if not data_dict:  # pragma: no cover
             msg = f"""
-                Can't create DGL graph: no complete edge types found.
+                Can't Create the DGLgraph: no complete edge types found.
                 The following edge types were skipped due to missing
                 vertex collection specifications: {et_blacklist}
             """
