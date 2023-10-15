@@ -811,7 +811,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                 edge_type_blacklist.add(edge_type)
                 continue
 
-            logger.debug(f"Preparing {count} '{edge_type}' edges")
+            logger.debug(f"Preparing {count} {edge_type} edges")
 
             # 4. Get the edge data corresponding to the current edge type
             et_df = df[(df["from_col"] == from_col) & (df["to_col"] == to_col)]
@@ -1207,7 +1207,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         into an ArangoDB DataFrame.
 
         :param e_type: The DGL edge type.
-        :type e_type: torch_geometric.typing.EdgeType
+        :type e_type: adbdgl_adapter.typings.DGLCanonicalEType
         :param edata: The DGL EdgeSpace for the current **e_type**.
         :type edata: dgl.view.EdgeSpace
         :param edata_size: The size of **edata**.
