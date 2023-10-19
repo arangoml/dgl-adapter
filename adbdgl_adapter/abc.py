@@ -15,16 +15,18 @@ class Abstract_ADBDGL_Adapter(ABC):
         raise NotImplementedError  # pragma: no cover
 
     def arangodb_to_dgl(
-        self, name: str, metagraph: ADBMetagraph, **query_options: Any
+        self, name: str, metagraph: ADBMetagraph, **adb_export_kwargs: Any
     ) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
     def arangodb_collections_to_dgl(
-        self, name: str, v_cols: Set[str], e_cols: Set[str], **query_options: Any
+        self, name: str, v_cols: Set[str], e_cols: Set[str], **adb_export_kwargs: Any
     ) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
-    def arangodb_graph_to_dgl(self, name: str, **query_options: Any) -> DGLHeteroGraph:
+    def arangodb_graph_to_dgl(
+        self, name: str, **adb_export_kwargs: Any
+    ) -> DGLHeteroGraph:
         raise NotImplementedError  # pragma: no cover
 
     def dgl_to_arangodb(
@@ -34,7 +36,7 @@ class Abstract_ADBDGL_Adapter(ABC):
         metagraph: DGLMetagraph = {},
         explicit_metagraph: bool = True,
         overwrite_graph: bool = False,
-        **import_options: Any,
+        **adb_import_kwargs: Any,
     ) -> ArangoDBGraph:
         raise NotImplementedError  # pragma: no cover
 

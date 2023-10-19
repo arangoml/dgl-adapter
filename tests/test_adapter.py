@@ -237,7 +237,7 @@ def test_validate_dgl_metagraph(bad_metagraph: Dict[Any, Any]) -> None:
 
 @pytest.mark.parametrize(
     "adapter, name, dgl_g, metagraph, \
-        explicit_metagraph, overwrite_graph, batch_size, import_options",
+        explicit_metagraph, overwrite_graph, batch_size, adb_import_kwargs",
     [
         (
             adbdgl_adapter,
@@ -356,7 +356,7 @@ def test_dgl_to_adb(
     explicit_metagraph: bool,
     overwrite_graph: bool,
     batch_size: Optional[int],
-    import_options: Any,
+    adb_import_kwargs: Any,
 ) -> None:
     db.delete_graph(name, drop_collections=True, ignore_missing=True)
     adapter.dgl_to_arangodb(
@@ -366,7 +366,7 @@ def test_dgl_to_adb(
         explicit_metagraph,
         overwrite_graph,
         batch_size,
-        **import_options
+        **adb_import_kwargs
     )
     assert_dgl_to_adb(name, dgl_g, metagraph, explicit_metagraph)
     db.delete_graph(name, drop_collections=True)

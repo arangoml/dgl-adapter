@@ -6,7 +6,7 @@ from math import ceil
 from typing import Any, Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union
 
 from arango.cursor import Cursor
-from arango.database import Database
+from arango.database import StandardDatabase
 from arango.graph import Graph as ADBGraph
 from dgl import DGLGraph, DGLHeteroGraph, graph, heterograph
 from dgl.view import EdgeSpace, HeteroEdgeDataView, HeteroNodeDataView, NodeSpace
@@ -59,14 +59,14 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
     def __init__(
         self,
-        db: Database,
+        db: StandardDatabase,
         controller: ADBDGL_Controller = ADBDGL_Controller(),
         logging_lvl: Union[str, int] = logging.INFO,
     ):
         self.set_logging(logging_lvl)
 
-        if not isinstance(db, Database):
-            msg = "**db** parameter must inherit from arango.database.Database"
+        if not isinstance(db, StandardDatabase):
+            msg = "**db** parameter must inherit from arango.database.StandardDatabase"
             raise TypeError(msg)
 
         if not isinstance(controller, ADBDGL_Controller):
@@ -74,12 +74,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             raise TypeError(msg)
 
         self.__db = db
+        self.__async_db = db.begin_async_execution(return_result=False)
         self.__cntrl = controller
 
         logger.info(f"Instantiated ADBDGL_Adapter with database '{db.name}'")
 
     @property
-    def db(self) -> Database:
+    def db(self) -> StandardDatabase:
         return self.__db  # pragma: no cover
 
     @property
@@ -94,7 +95,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
     ###########################
 
     def arangodb_to_dgl(
-        self, name: str, metagraph: ADBMetagraph, **query_options: Any
+        self, name: str, metagraph: ADBMetagraph, **adb_export_kwargs: Any
     ) -> Union[DGLGraph, DGLHeteroGraph]:
         """Create a DGL graph from an ArangoDB Metagraph. Carries
         over node/edge data via the **metagraph**.
@@ -127,10 +128,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
             See below for examples of **metagraph**.
         :type metagraph: adbdgl_adapter.typings.ADBMetagraph
-        :param query_options: Keyword arguments to specify AQL query options when
+        :param adb_export_kwargs: Keyword arguments to specify AQL query options when
             fetching documents from the ArangoDB instance. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
-        :type query_options: Any
+        :type adb_export_kwargs: Any
         :return: A DGL Homogeneous or Heterogeneous graph object
         :rtype: dgl.DGLGraph | dgl.DGLHeteroGraph
         :raise adbdgl_adapter.exceptions.ADBMetagraphError: If invalid metagraph.
@@ -266,7 +267,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
             # 1. Fetch ArangoDB vertices
             v_col_cursor, v_col_size = self.__fetch_adb_docs(
-                v_col, meta, **query_options
+                v_col, meta, **adb_export_kwargs
             )
 
             # 2. Process ArangoDB vertices
@@ -293,7 +294,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
 
             # 1. Fetch ArangoDB edges
             e_col_cursor, e_col_size = self.__fetch_adb_docs(
-                e_col, meta, **query_options
+                e_col, meta, **adb_export_kwargs
             )
 
             # 2. Process ArangoDB edges
@@ -331,7 +332,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         name: str,
         v_cols: Set[str],
         e_cols: Set[str],
-        **query_options: Any,
+        **adb_export_kwargs: Any,
     ) -> Union[DGLGraph, DGLHeteroGraph]:
         """Create a DGL graph from ArangoDB collections. Due to risk of
         ambiguity, this method DOES NOT transfer ArangoDB attributes to DGL.
@@ -342,10 +343,10 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type v_cols: Set[str]
         :param e_cols: The set of ArangoDB edge collections to import to DGL.
         :type e_cols: Set[str]
-        :param query_options: Keyword arguments to specify AQL query options when
+        :param adb_export_kwargs: Keyword arguments to specify AQL query options when
             fetching documents from the ArangoDB instance. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
-        :type query_options: Any
+        :type adb_export_kwargs: Any
         :return: A DGL Homogeneous or Heterogeneous graph object
         :rtype: dgl.DGLGraph | dgl.DGLHeteroGraph
         :raise adbdgl_adapter.exceptions.ADBMetagraphError: If invalid metagraph.
@@ -355,19 +356,19 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             "edgeCollections": {col: dict() for col in e_cols},
         }
 
-        return self.arangodb_to_dgl(name, metagraph, **query_options)
+        return self.arangodb_to_dgl(name, metagraph, **adb_export_kwargs)
 
     def arangodb_graph_to_dgl(
-        self, name: str, **query_options: Any
+        self, name: str, **adb_export_kwargs: Any
     ) -> Union[DGLGraph, DGLHeteroGraph]:
         """Create a DGL graph from an ArangoDB graph.
 
         :param name: The ArangoDB graph name.
         :type name: str
-        :param query_options: Keyword arguments to specify AQL query options when
+        :param adb_export_kwargs: Keyword arguments to specify AQL query options when
             fetching documents from the ArangoDB instance. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.aql.AQL.execute
-        :type query_options: Any
+        :type adb_export_kwargs: Any
         :return: A DGL Homogeneous or Heterogeneous graph object
         :rtype: dgl.DGLGraph | dgl.DGLHeteroGraph
         :raise adbdgl_adapter.exceptions.ADBMetagraphError: If invalid metagraph.
@@ -377,7 +378,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         edge_definitions: List[Json] = graph.edge_definitions()  # type: ignore
         e_cols: Set[str] = {c["edge_collection"] for c in edge_definitions}
 
-        return self.arangodb_collections_to_dgl(name, v_cols, e_cols, **query_options)
+        return self.arangodb_collections_to_dgl(
+            name, v_cols, e_cols, **adb_export_kwargs
+        )
 
     ###########################
     # Public: DGL -> ArangoDB #
@@ -391,7 +394,8 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         explicit_metagraph: bool = True,
         overwrite_graph: bool = False,
         batch_size: Optional[int] = None,
-        **import_options: Any,
+        use_async: bool = False,
+        **adb_import_kwargs: Any,
     ) -> ADBGraph:
         """Create an ArangoDB graph from a DGL graph.
 
@@ -435,10 +439,13 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             **batch_size**. Defaults to `None`, which processes each
             NodeStorage & EdgeStorage in one batch.
         :type batch_size: int
-        :param import_options: Keyword arguments to specify additional
+        :param use_async: Performs asynchronous ArangoDB ingestion if enabled.
+            Defaults to False.
+        :type use_async: bool
+        :param adb_import_kwargs: Keyword arguments to specify additional
             parameters for ArangoDB document insertion. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
-        :type import_options: Any
+        :type adb_import_kwargs: Any
         :return: The ArangoDB Graph API wrapper.
         :rtype: arango.graph.Graph
         :raise adbdgl_adapter.exceptions.DGLMetagraphError: If invalid metagraph.
@@ -536,13 +543,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                         end_index,
                     )
 
-                    bar_progress.advance(
-                        bar_progress_task, advance=end_index - start_index
-                    )
+                    bar_progress.advance(bar_progress_task, advance=len(df))
 
                     # 2. Insert the ArangoDB Node Documents
                     self.__insert_adb_docs(
-                        spinner_progress, df, n_type, **import_options
+                        spinner_progress, df, n_type, use_async, **adb_import_kwargs
                     )
 
                     # 3. Update the batch indices
@@ -588,13 +593,11 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
                         end_index,
                     )
 
-                    bar_progress.advance(
-                        bar_progress_task, advance=end_index - start_index
-                    )
+                    bar_progress.advance(bar_progress_task, advance=len(df))
 
                     # 2. Insert the ArangoDB Edge Documents
                     self.__insert_adb_docs(
-                        spinner_progress, df, e_type, **import_options
+                        spinner_progress, df, e_type[1], use_async, **adb_import_kwargs
                     )
 
                     # 3. Update the batch indices
@@ -612,7 +615,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         self,
         col: str,
         meta: Union[Set[str], Dict[str, ADBMetagraphValues]],
-        **export_options: Any,
+        **adb_export_kwargs: Any,
     ) -> Tuple[Cursor, int]:
         """ArangoDB -> DGL: Fetches ArangoDB documents within a collection.
         Returns the documents in a DataFrame.
@@ -621,9 +624,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type col: str
         :param meta: The MetaGraph associated to **col**
         :type meta: Set[str] | Dict[str, adbdgl_adapter.typings.ADBMetagraphValues]
-        :param export_options: Keyword arguments to specify AQL query options
+        :param adb_export_kwargs: Keyword arguments to specify AQL query options
             when fetching documents from the ArangoDB instance.
-        :type export_options: Any
+        :type adb_export_kwargs: Any
         :return: A DataFrame representing the ArangoDB documents.
         :rtype: pandas.DataFrame
         """
@@ -665,7 +668,7 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
             cursor: Cursor = self.__db.aql.execute(  # type: ignore
                 f"FOR doc IN @@col RETURN {get_aql_return_value(meta)}",
                 bind_vars={"@col": col},
-                **{**export_options, **{"stream": True}},
+                **{**adb_export_kwargs, **{"stream": True}},
             )
 
             return cursor, col_size
@@ -1404,8 +1407,9 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         self,
         spinner_progress: Progress,
         df: DataFrame,
-        doc_type: Union[str, DGLCanonicalEType],
-        **import_options: Any,
+        col: str,
+        use_async: bool,
+        **adb_import_kwargs: Any,
     ) -> None:
         """DGL -> ArangoDB: Insert ArangoDB documents into their ArangoDB collection.
 
@@ -1413,20 +1417,21 @@ class ADBDGL_Adapter(Abstract_ADBDGL_Adapter):
         :type spinner_progress: rich.progress.Progress
         :param df: To-be-inserted ArangoDB documents, formatted as a DataFrame
         :type df: pandas.DataFrame
-        :param doc_type: The node or edge type of the soon-to-be ArangoDB documents
-        :type doc_type: str | tuple[str, str, str]
-        :param import_options: Keyword arguments to specify additional
+        :param col: The ArangoDB collection name.
+        :type col: str
+        :param use_async: Performs asynchronous ArangoDB ingestion if enabled.
+        :type use_async: bool
+        :param adb_import_kwargs: Keyword arguments to specify additional
             parameters for ArangoDB document insertion. Full parameter list:
             https://docs.python-arango.com/en/main/specs.html#arango.collection.Collection.import_bulk
-        :param import_options: Any
+        :param adb_import_kwargs: Any
         """
-        col = doc_type[1] if isinstance(doc_type, tuple) else doc_type
-
         action = f"ADB Import: '{col}' ({len(df)})"
         spinner_progress_task = spinner_progress.add_task("", action=action)
 
         docs = df.to_dict("records")
-        result = self.__db.collection(col).import_bulk(docs, **import_options)
+        db = self.__async_db if use_async else self.__db
+        result = db.collection(col).import_bulk(docs, **adb_import_kwargs)
         logger.debug(result)
 
         df.drop(df.index, inplace=True)
