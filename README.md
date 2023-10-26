@@ -46,18 +46,21 @@ pip install git+https://github.com/arangoml/dgl-adapter.git
 Also available as an ArangoDB Lunch & Learn session: [Graph & Beyond Course #2.8](https://www.arangodb.com/resources/lunch-sessions/graph-beyond-lunch-break-2-8-dgl-adapter/)
 
 ```py
-import pandas
-import torch
 import dgl
+import torch
+import pandas
 
-from arango import ArangoClient  # Python-Arango driver
-
+from arango import ArangoClient
 from adbdgl_adapter import ADBDGL_Adapter, ADBDGL_Controller
 from adbdgl_adapter.encoders import IdentityEncoder, CategoricalEncoder
 
-# Let's assume that the ArangoDB "IMDB" dataset is imported to this endpoint
-db = ArangoClient(hosts="http://localhost:8529").db("_system", username="root", password="")
+# Connect to ArangoDB
+db = ArangoClient().db()
 
+# Instantiate the adapter
+adbdgl_adapter = ADBDGL_Adapter(db)
+
+# Create a DGL Heterogeneous Graph
 fake_hetero = dgl.heterograph({
     ("user", "follows", "user"): (torch.tensor([0, 1]), torch.tensor([1, 2])),
     ("user", "follows", "topic"): (torch.tensor([1, 1]), torch.tensor([1, 2])),
@@ -67,37 +70,21 @@ fake_hetero.nodes["user"].data["features"] = torch.tensor([21, 44, 16, 25])
 fake_hetero.nodes["user"].data["label"] = torch.tensor([1, 2, 0, 1])
 fake_hetero.nodes["game"].data["features"] = torch.tensor([[0, 0], [0, 1], [1, 0], [1, 1], [1, 1]])
 fake_hetero.edges[("user", "plays", "game")].data["features"] = torch.tensor([[6, 1], [1000, 0]])
-
-adbdgl_adapter = ADBDGL_Adapter(db)
 ```
 
 ### DGL to ArangoDB
 ```py
-# 1.1: DGL to ArangoDB
+#############################
+# 1.1: without a  Metagraph #
+#############################
+
 adb_g = adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero)
 
-# 1.2: DGL to ArangoDB with a (completely optional) metagraph for customized adapter behaviour
-def label_tensor_to_2_column_dataframe(dgl_tensor, adb_df):
-    """
-    A user-defined function to create two
-    ArangoDB attributes out of the 'user' label tensor
+#########################
+# 1.2: with a Metagraph #
+#########################
 
-    :param dgl_tensor: The DGL Tensor containing the data
-    :type dgl_tensor: torch.Tensor
-    :param adb_df: The ArangoDB DataFrame to populate, whose
-        size is preset to the length of **dgl_tensor**.
-    :type adb_df: pandas.DataFrame
-
-    NOTE: user-defined functions must return the modified **adb_df**
-    """
-    label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
-
-    adb_df["label_num"] = dgl_tensor.tolist()
-    adb_df["label_str"] = adb_df["label_num"].map(label_map)
-
-    return adb_df
-
-
+# Specifying a Metagraph provides customized adapter behaviour
 metagraph = {
     "nodeTypes": {
         "user": {
@@ -115,15 +102,39 @@ metagraph = {
     },
 }
 
+def label_tensor_to_2_column_dataframe(dgl_tensor: torch.Tensor, adb_df: pandas.DataFrame) -> pandas.DataFrame:
+    """A user-defined function to create two
+    ArangoDB attributes out of the 'user' label tensor
+
+    :param dgl_tensor: The DGL Tensor containing the data
+    :type dgl_tensor: torch.Tensor
+    :param adb_df: The ArangoDB DataFrame to populate, whose
+        size is preset to the length of **dgl_tensor**.
+    :type adb_df: pandas.DataFrame
+    :return: The populated ArangoDB DataFrame
+    :rtype: pandas.DataFrame
+    """
+    label_map = {0: "Class A", 1: "Class B", 2: "Class C"}
+
+    adb_df["label_num"] = dgl_tensor.tolist()
+    adb_df["label_str"] = adb_df["label_num"].map(label_map)
+
+    return adb_df
+
 
 adb_g = adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero, metagraph, explicit_metagraph=False)
 
-# 1.3: DGL to ArangoDB with the same (optional) metagraph, but with `explicit_metagraph=True`
+#######################################################
+# 1.3: with a Metagraph and `explicit_metagraph=True` #
+#######################################################
+
 # With `explicit_metagraph=True`, the node & edge types omitted from the metagraph will NOT be converted to ArangoDB.
-# Only 'user', 'game', and ('user', 'plays', 'game') will be brought over (i.e 'topic', ('user', 'follows', 'user'), ... are ignored)
 adb_g = adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero, metagraph, explicit_metagraph=True)
 
-# 1.4: DGL to ArangoDB with a Custom Controller  (more user-defined behavior)
+########################################
+# 1.4: with a custom ADBDGL Controller #
+########################################
+
 class Custom_ADBDGL_Controller(ADBDGL_Controller):
     def _prepare_dgl_node(self, dgl_node: dict, node_type: str) -> dict:
         """Optionally modify a DGL node object before it gets inserted into its designated ArangoDB collection.
@@ -156,13 +167,25 @@ adb_g = ADBDGL_Adapter(db, Custom_ADBDGL_Controller()).dgl_to_arangodb("FakeHete
 db.delete_graph("FakeHetero", drop_collections=True, ignore_missing=True)
 adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero)
 
-# 2.1: ArangoDB to DGL via Graph name (does not transfer attributes)
+#######################
+# 2.1: via Graph name #
+#######################
+
+# Due to risk of ambiguity, this method does not transfer attributes
 dgl_g = adbdgl_adapter.arangodb_graph_to_dgl("FakeHetero")
 
-# 2.2: ArangoDB to DGL via Collection names (does not transfer attributes)
+#############################
+# 2.2: via Collection names #
+#############################
+
+# Due to risk of ambiguity, this method does not transfer attributes
 dgl_g = adbdgl_adapter.arangodb_collections_to_dgl("FakeHetero", v_cols={"user", "game"}, e_cols={"plays"})
 
-# 2.3: ArangoDB to DGL via Metagraph v1 (transfer attributes "as is", meaning they are already formatted to DGL data standards)
+######################
+# 2.3: via Metagraph #
+######################
+
+# Transfers attributes "as is", meaning they are already formatted to DGL data standards.
 # Learn more about the DGL Data Standards here: https://docs.dgl.ai/guide/graph.html#guide-graph
 metagraph_v1 = {
     "vertexCollections": {
@@ -176,10 +199,14 @@ metagraph_v1 = {
         "follows": {}
     },
 }
+
 dgl_g = adbdgl_adapter.arangodb_to_dgl("FakeHetero", metagraph_v1)
 
-# 2.4: ArangoDB to DGL via Metagraph v2 (transfer attributes via user-defined encoders)
-# For more info on user-defined encoders, see https://pytorch-geometric.readthedocs.io/en/latest/notes/load_csv.html
+#################################################
+# 2.4: via Metagraph with user-defined encoders #
+#################################################
+
+# Transforms attributes via user-defined encoders
 metagraph_v2 = {
     "vertexCollections": {
         "Movies": {
@@ -198,21 +225,14 @@ metagraph_v2 = {
     },
     "edgeCollections": {"Ratings": {"weight": "Rating"}},
 }
-dgl_g = adbdgl_adapter.arangodb_to_dgl("IMDB", metagraph_v2)
 
-# 2.5: ArangoDB to DGL via Metagraph v3 (transfer attributes via user-defined functions)
-def udf_user_features(user_df):
-    # process the user_df Pandas DataFrame to return a feature matrix in a tensor
-    # user_df["features"] = ...
-    return torch.tensor(user_df["features"].to_list())
+dgl_g = adbdgl_adapter.arangodb_to_dgl("imdb", metagraph_v2)
 
+##################################################
+# 2.5: via Metagraph with user-defined functions #
+##################################################
 
-def udf_game_features(game_df):
-    # process the game_df Pandas DataFrame to return a feature matrix in a tensor
-    # game_df["features"] = ...
-    return torch.tensor(game_df["features"].to_list())
-
-
+# Transforms attributes via user-defined functions
 metagraph_v3 = {
     "vertexCollections": {
         "user": {
@@ -225,6 +245,17 @@ metagraph_v3 = {
         "plays": {"features": (lambda df: torch.tensor(df["features"].to_list()))},
     },
 }
+
+def udf_user_features(user_df: pandas.DataFrame) -> torch.Tensor:
+   # user_df["features"] = ...
+    return torch.tensor(user_df["features"].to_list())
+
+
+def udf_game_features(game_df: pandas.DataFrame) -> torch.Tensor:
+    # game_df["features"] = ...
+    return torch.tensor(game_df["features"].to_list())
+
+
 dgl_g = adbdgl_adapter.arangodb_to_dgl("FakeHetero", metagraph_v3)
 ```
 
