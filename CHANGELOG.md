@@ -1,3 +1,162 @@
+## 3.0.0 (2023-10-26)
+
+### New
+
+* Adbdgl refactor (#30) [Anthony Mahanna]
+
+  * initial commit (WIP)
+
+  * checkpoint
+
+  * Update adapter.py
+
+  * checkpoint 2
+
+  * cleanup
+
+  * checkpoint
+
+  * checkpoint
+
+  * cleanup: `valid_meta`
+
+  * mvp: #29
+
+  todo: update jupyter notebook to reflect new functionality
+
+  * fix: black
+
+  * fix: flake8
+
+  * Update setup.py
+
+  * temp: try for 3.10
+
+  * new: 3.10 support
+
+  * cleanup: progress bars
+
+  * update: documentation
+
+  * Update README.md
+
+  * new: adbdgl 3.0.0 notebook
+
+  * new: address comments
+
+  * revive PR
+
+  improvements based on pyg-adapter, general code cleanup
+
+  * swap python 3.7 support for 3.11
+
+  3.7 has reached eol
+
+  * fix: PyG typos
+
+  * cleanup: udf behaviour (dgl to arangodb)
+
+  * fix: rich progress style
+
+  * lock python-arango version
+
+  * new: notebook output file
+
+  * code cleanup
+
+  * fix: explicit_metagraph
+
+  that took a while to find...
+
+  * cleanup function order
+
+  * more cleanup
+
+  * address comments
+
+  * fix: PyG typos
+
+  * Update README.md
+
+  * fix: typo
+
+  * DGL Refactor Updates (#31)
+
+  * initial commit
+
+  * bump
+
+  * cleanup workflows
+
+  * Update build.yml
+
+  * Update build.yml
+
+  * parameter renaming, new `use_async` param
+
+  * update release action
+
+  * Update README.md
+
+  * Update README.md
+
+* More adapter housekeeping (#26) [Anthony Mahanna]
+
+  * new: debug log on individual node/edge levels
+
+  * Update README.md
+
+  * cleanup
+
+  * config cleanup
+
+  * fix: typo
+
+  * new: __insert_adb_docs
+
+  also: cleans up node/edge insertion in ArangoDB to DGL
+
+  * Update setup.cfg
+
+  * Update conftest.py
+
+  * cleanup: __fetch_adb_docs
+
+  was complicating things for no reason
+
+  * cleanup & fix: etypes_to_edefinitions
+
+  also:
+
+  * fix: mypy
+
+  * fix: metagraph example
+
+  * new: remove ValueError exception
+
+  I was under the impression that working with an ArangoDB edge collection that had multiple "from" and "to" vertex types was not possible to convert to DGL. This commit allows for it
+
+  * fix: black
+
+  * fix: tests
+
+  * Update adapter.py
+
+  * fix: black
+
+  * cleanup
+
+  * Update conftest.py
+
+  * fix: isort
+
+### Other
+
+* Changelog: release 2.1.0 (#25) [github-actions[bot]]
+
+  !gitchangelog
+
+
 ## 2.1.0 (2022-06-29)
 
 ### New
