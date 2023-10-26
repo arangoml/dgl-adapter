@@ -74,9 +74,9 @@ fake_hetero.edges[("user", "plays", "game")].data["features"] = torch.tensor([[6
 
 ### DGL to ArangoDB
 ```py
-#############################
-# 1.1: without a  Metagraph #
-#############################
+############################
+# 1.1: without a Metagraph #
+############################
 
 adb_g = adbdgl_adapter.dgl_to_arangodb("FakeHetero", fake_hetero)
 
