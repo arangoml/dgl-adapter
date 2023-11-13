@@ -54,10 +54,10 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/arangoml/pyg-adapter"
+"Homepage" = "https://github.com/arangoml/dgl-adapter"
 
 [tool.setuptools]
-packages = ["adbpyg_adapter"]
+packages = ["adbdgl_adapter"]
 
 [tool.pytest.ini_options]
 addopts = "-s -vv"
