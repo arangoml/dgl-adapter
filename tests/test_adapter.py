@@ -44,7 +44,7 @@ def test_validate_constructor() -> None:
         pass
 
     with pytest.raises(TypeError):
-        ADBDGL_Adapter(bad_db)  # type: ignore
+        ADBDGL_Adapter(bad_db)
 
     with pytest.raises(TypeError):
         ADBDGL_Adapter(db, Bad_ADBDGL_Controller())  # type: ignore
@@ -366,7 +366,7 @@ def test_dgl_to_adb(
         explicit_metagraph,
         overwrite_graph,
         batch_size,
-        **adb_import_kwargs
+        **adb_import_kwargs,
     )
     assert_dgl_to_adb(name, dgl_g, metagraph, explicit_metagraph)
     db.delete_graph(name, drop_collections=True)
@@ -379,11 +379,11 @@ def test_dgl_to_adb_with_controller() -> None:
 
     ADBDGL_Adapter(db, Custom_ADBDGL_Controller()).dgl_to_arangodb(name, data)
 
-    for doc in db.collection(name + "_N"):  # type: ignore
+    for doc in db.collection(name + "_N"):
         assert "foo" in doc
         assert doc["foo"] == "bar"
 
-    for edge in db.collection(name + "_E"):  # type: ignore
+    for edge in db.collection(name + "_E"):
         assert "bar" in edge
         assert edge["bar"] == "foo"
 
@@ -659,8 +659,8 @@ def test_adb_graph_to_dgl(
     dgl_g_new = adapter.arangodb_graph_to_dgl(name)
 
     graph = db.graph(name)
-    v_cols: Set[str] = graph.vertex_collections()  # type: ignore
-    edge_definitions: List[Dict[str, Any]] = graph.edge_definitions()  # type: ignore
+    v_cols: Set[str] = graph.vertex_collections()
+    edge_definitions: List[Dict[str, Any]] = graph.edge_definitions()
     e_cols: Set[str] = {c["edge_collection"] for c in edge_definitions}
 
     assert_adb_to_dgl(
