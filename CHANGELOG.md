@@ -1,3 +1,40 @@
+## 3.0.1 (2024-01-19)
+
+### Other
+
+* Cleanup  `__fetch adb docs` (#35) [Anthony Mahanna]
+
+  * cleanup: `__fetch_adb_docs`
+
+  * set `continue-on-error`
+
+* Update Build Distribution Command (#34) [Anthony Mahanna]
+
+  initial commit
+
+* Misc: update download badge. [Anthony Mahanna]
+
+* Migrate to `pyproject.toml` (#33) [Anthony Mahanna]
+
+  * initial commit
+
+  * add 3.12 to build workflow
+
+  * fix typos
+
+  * fix lint & dependencies
+
+  * Update pyproject.toml
+
+  * disable python 3.12
+
+  * fix lint
+
+* Changelog: release 3.0.0 (#32) [github-actions[bot]]
+
+  !gitchangelog
+
+
 ## 3.0.0 (2023-10-26)
 
 ### New
